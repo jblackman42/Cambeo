@@ -1,0 +1,174 @@
+#!/usr/bin/env node
+/**
+ * Vendor → optimized static assets for the card table.
+ *
+ * - Strips the upstream card frame (path#path5)
+ * - SVGO on every face
+ * - Pip cards stay SVG; face cards + jokers rasterize to 2x/3x WebP
+ * - Card back is sourced from the upstream PNG (no SVG back exists)
+ * - Writes hashed files under apps/web/public/cards/ and a TS manifest
+ */
+import { createHash } from 'node:crypto';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
+import { optimize } from 'svgo';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const vendorSvgDir = path.join(root, 'vendor/playing-cards-assets/svg-cards');
+const vendorBack = path.join(root, 'vendor/playing-cards-assets/png/back@2x.png');
+const outDir = path.join(root, 'apps/web/public/cards');
+const manifestPath = path.join(root, 'apps/web/src/lib/card-art-manifest.ts');
+
+const VIEWBOX_W = 167.0869141;
+const VIEWBOX_H = 242.6669922;
+const WIDTH_2X = 240;
+const WIDTH_3X = 360;
+const HEIGHT_2X = Math.round((WIDTH_2X * VIEWBOX_H) / VIEWBOX_W);
+const HEIGHT_3X = Math.round((WIDTH_3X * VIEWBOX_H) / VIEWBOX_W);
+
+const FACE_RANKS = new Set(['jack', 'queen', 'king']);
+const JOKERS = new Set(['black_joker', 'red_joker']);
+
+const removeCardFrame = {
+  name: 'removeCardFrame',
+  fn: () => ({
+    element: {
+      enter: (node, parentNode) => {
+        if (node.name === 'path' && node.attributes?.id === 'path5') {
+          parentNode.children = parentNode.children.filter((child) => child !== node);
+        }
+      },
+    },
+  }),
+};
+
+function hashBytes(buf) {
+  return createHash('sha256').update(buf).digest('hex').slice(0, 8);
+}
+
+function stemOf(filename) {
+  return filename.replace(/\.svg$/i, '');
+}
+
+function isWebpStem(stem) {
+  if (JOKERS.has(stem)) return true;
+  const rank = stem.split('_of_')[0];
+  return FACE_RANKS.has(rank);
+}
+
+function jsString(value) {
+  return JSON.stringify(value);
+}
+
+async function rasterizeSvg(svg, width, height) {
+  return sharp(Buffer.from(svg), { density: 216 })
+    .resize(width, height, { fit: 'fill' })
+    .webp({ quality: 80, alphaQuality: 90, effort: 4 })
+    .toBuffer();
+}
+
+async function rasterizePng(pngPath, width, height) {
+  return sharp(pngPath)
+    .resize(width, height, { fit: 'fill' })
+    .webp({ quality: 80, alphaQuality: 90, effort: 4 })
+    .toBuffer();
+}
+
+async function main() {
+  const names = (await readdir(vendorSvgDir)).filter((n) => n.endsWith('.svg')).sort();
+  if (names.length !== 54) {
+    throw new Error(`Expected 54 SVG faces, found ${names.length} in ${vendorSvgDir}`);
+  }
+
+  await rm(outDir, { recursive: true, force: true });
+  await mkdir(outDir, { recursive: true });
+
+  /** @type {Record<string, { kind: 'svg'; src: string } | { kind: 'webp'; src: string; srcSet: string }>} */
+  const entries = {};
+
+  for (const name of names) {
+    const stem = stemOf(name);
+    const raw = await readFile(path.join(vendorSvgDir, name), 'utf8');
+    const result = optimize(raw, {
+      path: name,
+      multipass: true,
+      plugins: [removeCardFrame, 'preset-default'],
+    });
+    if ('data' in result === false) {
+      throw new Error(`SVGO failed on ${name}`);
+    }
+    const svg = result.data;
+
+    if (isWebpStem(stem)) {
+      const webp2x = await rasterizeSvg(svg, WIDTH_2X, HEIGHT_2X);
+      const webp3x = await rasterizeSvg(svg, WIDTH_3X, HEIGHT_3X);
+      const hash = hashBytes(Buffer.concat([webp2x, webp3x]));
+      const file2x = `${stem}-${hash}@2x.webp`;
+      const file3x = `${stem}-${hash}@3x.webp`;
+      await writeFile(path.join(outDir, file2x), webp2x);
+      await writeFile(path.join(outDir, file3x), webp3x);
+      const src = `/cards/${file2x}`;
+      entries[stem] = {
+        kind: 'webp',
+        src,
+        srcSet: `/cards/${file2x} 2x, /cards/${file3x} 3x`,
+      };
+      console.log(`webp  ${stem}  ${webp2x.length} / ${webp3x.length} bytes`);
+    } else {
+      const buf = Buffer.from(svg);
+      const hash = hashBytes(buf);
+      const file = `${stem}-${hash}.svg`;
+      await writeFile(path.join(outDir, file), buf);
+      entries[stem] = { kind: 'svg', src: `/cards/${file}` };
+      console.log(`svg   ${stem}  ${buf.length} bytes`);
+    }
+  }
+
+  const back2x = await rasterizePng(vendorBack, WIDTH_2X, HEIGHT_2X);
+  const back3x = await rasterizePng(vendorBack, WIDTH_3X, HEIGHT_3X);
+  const backHash = hashBytes(Buffer.concat([back2x, back3x]));
+  const back2xFile = `back-${backHash}@2x.webp`;
+  const back3xFile = `back-${backHash}@3x.webp`;
+  await writeFile(path.join(outDir, back2xFile), back2x);
+  await writeFile(path.join(outDir, back3xFile), back3x);
+  const back = {
+    kind: 'webp',
+    src: `/cards/${back2xFile}`,
+    srcSet: `/cards/${back2xFile} 2x, /cards/${back3xFile} 3x`,
+  };
+  console.log(`webp  back  ${back2x.length} / ${back3x.length} bytes`);
+
+  const lines = [
+    '/* Generated by scripts/optimize-cards.mjs — do not edit. */',
+    '',
+    "export type CardArtSvg = { kind: 'svg'; src: string };",
+    "export type CardArtWebp = { kind: 'webp'; src: string; srcSet: string };",
+    'export type CardArtFile = CardArtSvg | CardArtWebp;',
+    '',
+    'export const CARD_ART_MANIFEST = {',
+    ...Object.keys(entries)
+      .sort()
+      .map((stem) => {
+        const entry = entries[stem];
+        if (entry.kind === 'svg') {
+          return `  ${jsString(stem)}: { kind: 'svg' as const, src: ${jsString(entry.src)} },`;
+        }
+        return `  ${jsString(stem)}: { kind: 'webp' as const, src: ${jsString(entry.src)}, srcSet: ${jsString(entry.srcSet)} },`;
+      }),
+    '} as const;',
+    '',
+    'export type CardArtStem = keyof typeof CARD_ART_MANIFEST;',
+    '',
+    `export const CARD_BACK_ASSET: CardArtWebp = { kind: 'webp', src: ${jsString(back.src)}, srcSet: ${jsString(back.srcSet)} };`,
+    '',
+  ];
+  await writeFile(manifestPath, lines.join('\n'));
+  console.log(`wrote ${path.relative(root, manifestPath)}`);
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

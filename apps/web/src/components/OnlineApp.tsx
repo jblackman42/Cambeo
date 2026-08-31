@@ -1,5 +1,6 @@
 'use client';
 
+import { CardArtPreloader } from '@/components/CardArtPreloader';
 import { OnlineLobby } from '@/components/OnlineLobby';
 import { Table } from '@/components/Table';
 import { useGame } from '@/lib/play-context';
@@ -10,6 +11,7 @@ function Shell() {
 
   return (
     <div className="app-shell">
+      <CardArtPreloader />
       <header>
         <h1 className="brand">Cambeo</h1>
         <p className="brand-sub">

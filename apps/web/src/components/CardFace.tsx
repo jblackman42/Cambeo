@@ -1,5 +1,6 @@
 import type { PublicCardView, SlotView } from '@cambeo/shared';
-import { isRedSuit, rankLabel, suitGlyph } from '@/lib/format';
+import { cardBackAsset, cardKeyToAsset } from '@/lib/card-art';
+import { rankLabel } from '@/lib/format';
 
 type CardProps = {
   slot?: SlotView;
@@ -11,6 +12,19 @@ type CardProps = {
   asButton?: boolean;
 };
 
+function CardArtImg({ src, srcSet, known }: { src: string; srcSet?: string; known: boolean }) {
+  return (
+    <img
+      className="card-art"
+      src={src}
+      srcSet={srcSet}
+      alt=""
+      draggable={false}
+      decoding={known ? 'sync' : 'async'}
+    />
+  );
+}
+
 export function CardFace({
   slot,
   face,
@@ -20,40 +34,36 @@ export function CardFace({
   disabled = false,
   asButton = true,
 }: CardProps) {
-  const known = face
-    ? true
-    : slot
-      ? slot.known
-      : false;
+  const known = face ? true : slot ? slot.known : false;
   const key = face?.key ?? (slot && slot.known ? slot.key : null);
   const suit = face?.suit ?? (slot && slot.known ? slot.suit : null);
   const value = face?.value ?? (slot && slot.known ? slot.value : null);
-  const red = suit ? isRedSuit(suit) : false;
 
   const className = 'card' + (asButton && onClick ? ' card-btn' : '');
-  const content = known && key && suit ? (
-    <>
-      <span className="card-rank">
-        {rankLabel(key)}
-        {suit !== 'joker' ? suitGlyph(suit) : ''}
-      </span>
-      <span className="card-suit" aria-hidden>
-        {suitGlyph(suit)}
-      </span>
-      {value !== null && <span className="card-value">{value}</span>}
-    </>
-  ) : (
-    <span className="card-back-mark" aria-hidden>
-      ◆
-    </span>
-  );
+  const jokerName = key === 'HEAVEN' ? 'Heaven' : key === 'HELL' ? 'Hell' : null;
+
+  const content =
+    known && key && suit ? (
+      <>
+        <CardArtImg {...cardKeyToAsset(key, suit)} known />
+        {jokerName && <span className="card-joker-name">{jokerName}</span>}
+        {value !== null && <span className="card-value">{value}</span>}
+      </>
+    ) : (
+      <CardArtImg {...cardBackAsset()} known={false} />
+    );
 
   const dataAttrs = {
     'data-known': known ? 'true' : 'false',
-    'data-red': red ? 'true' : 'false',
     'data-selectable': selectable ? 'true' : 'false',
     'data-mode': selectable ? mode : 'none',
+    'data-key': key ?? undefined,
   };
+
+  const ariaLabel =
+    known && key
+      ? (jokerName ?? `${rankLabel(key)}${suit && suit !== 'joker' ? ` of ${suit}` : ''}`)
+      : 'face-down card';
 
   if (asButton && onClick) {
     return (
@@ -63,7 +73,7 @@ export function CardFace({
         onClick={onClick}
         disabled={disabled}
         {...dataAttrs}
-        aria-label={known && key ? `${rankLabel(key)} ${suit}` : 'face-down card'}
+        aria-label={ariaLabel}
       >
         {content}
       </button>
@@ -71,7 +81,7 @@ export function CardFace({
   }
 
   return (
-    <div className={className} {...dataAttrs}>
+    <div className={className} {...dataAttrs} aria-label={ariaLabel}>
       {content}
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { CardArtPreloader } from '@/components/CardArtPreloader';
 import { Lobby } from '@/components/Lobby';
 import { Table } from '@/components/Table';
 import { GameProvider, useGame } from '@/lib/game-store';
@@ -11,6 +12,7 @@ function Shell() {
 
   return (
     <div className="app-shell">
+      <CardArtPreloader />
       <header>
         <h1 className="brand">Cambeo</h1>
         <p className="brand-sub">{view ? 'Hot-seat table' : 'Fewest points wins'}</p>

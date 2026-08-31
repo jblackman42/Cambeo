@@ -3,3 +3,6 @@ dist
 coverage
 pnpm-lock.yaml
 *.md
+vendor
+apps/web/public/cards
+apps/web/src/lib/card-art-manifest.ts

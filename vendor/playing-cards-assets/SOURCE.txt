@@ -1,0 +1,8 @@
+Source: https://github.com/hayeah/playing-cards-assets (MIT; see LICENSE)
+Underlying artwork: public-domain vector-playing-cards
+
+Vendored:
+- svg-cards/*.svg — 54 faces (borders still present as path#path5; stripped by scripts/optimize-cards.mjs)
+- png/back.png, png/back@2x.png — no SVG card back exists upstream
+
+Do not edit these files; recopy from upstream and re-run `pnpm cards:optimize`.

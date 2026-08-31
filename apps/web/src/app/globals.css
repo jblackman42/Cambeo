@@ -476,26 +476,25 @@ button {
   padding: 0;
 }
 
-/* Playing card */
+/* Playing card — frame is ours; art is a static asset composited inside. */
 .card {
   --w: 72px;
   width: var(--w);
   aspect-ratio: var(--card-ratio);
   border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.22);
   background: var(--paper);
   color: var(--ink);
   position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 0.35rem 0.4rem;
+  overflow: hidden;
+  padding: 0;
   box-shadow: 0 2px 6px var(--shadow);
   font-family: var(--font-display);
   user-select: none;
   transition:
     transform 0.12s ease,
-    outline-color 0.12s ease;
+    outline-color 0.12s ease,
+    box-shadow 0.12s ease;
   touch-action: manipulation;
 }
 
@@ -503,7 +502,7 @@ button {
   appearance: none;
   -webkit-appearance: none;
   text-align: left;
-  padding: 0.35rem 0.4rem;
+  padding: 0;
   cursor: pointer;
 }
 
@@ -523,54 +522,80 @@ button {
   outline-offset: 1px;
 }
 
+.card[data-known='true'] {
+  box-shadow:
+    0 2px 6px var(--shadow),
+    inset 0 0 0 1.5px rgba(212, 160, 23, 0.45);
+}
+
 .card[data-known='false'] {
-  background: repeating-linear-gradient(-45deg, #1e4d42, #1e4d42 6px, #163c34 6px, #163c34 12px);
-  color: transparent;
-  border-color: rgba(247, 243, 234, 0.25);
+  border-color: rgba(247, 243, 234, 0.28);
 }
 
-.card[data-known='false'] .card-value {
-  display: none;
+.card-empty {
+  opacity: 0.35;
+  background: transparent;
+  box-shadow: none;
+  border-style: dashed;
+  border-color: rgba(247, 243, 234, 0.35);
 }
 
-.card[data-red='true'] {
-  color: var(--crimson);
+.card-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 
-.card-rank {
-  font-size: 0.95rem;
+.card[data-known='false'] .card-art {
+  object-fit: cover;
+}
+
+.card-joker-name {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 1;
+  font-size: 0.62rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   line-height: 1;
+  padding: 0.22rem 0.35rem;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
-.card-suit {
-  font-size: 1.35rem;
-  align-self: center;
-  line-height: 1;
+.card[data-key='HEAVEN'] .card-joker-name {
+  background: rgba(212, 160, 23, 0.94);
+  color: var(--ink);
+}
+
+.card[data-key='HELL'] .card-joker-name {
+  background: rgba(26, 31, 28, 0.9);
+  color: var(--paper);
 }
 
 .card-value {
   position: absolute;
-  right: 0.3rem;
-  bottom: 0.25rem;
-  font-size: 0.7rem;
+  right: 0.22rem;
+  bottom: 0.18rem;
+  z-index: 1;
+  font-size: 0.68rem;
   font-weight: 700;
   font-family: var(--font-body);
-  background: rgba(26, 31, 28, 0.08);
+  background: rgba(247, 243, 234, 0.92);
   border-radius: 4px;
-  padding: 0.1rem 0.25rem;
+  padding: 0.08rem 0.22rem;
   color: var(--ink);
-}
-
-.card-back-mark {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(247, 243, 234, 0.35);
-  font-size: 1.1rem;
-  font-weight: 700;
+  line-height: 1.1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .drawn-card-wrap {

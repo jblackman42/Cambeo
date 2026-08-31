@@ -8,11 +8,7 @@ import { Scoring } from '@/components/Scoring';
 import { SeatSwitcher } from '@/components/SeatSwitcher';
 import { useGame, type InteractionMode } from '@/lib/play-context';
 
-function cardSelectable(
-  mode: InteractionMode,
-  viewerId: PlayerId,
-  ownerId: PlayerId,
-): boolean {
+function cardSelectable(mode: InteractionMode, viewerId: PlayerId, ownerId: PlayerId): boolean {
   if (mode.kind === 'replace' || mode.kind === 'give') {
     return ownerId === viewerId;
   }
@@ -87,11 +83,7 @@ export function Table() {
           if (!player) return null;
           const protectedCaller = view.cambeoCallerId === id;
           return (
-            <div
-              key={id}
-              className="opponent-block"
-              data-protected={protectedCaller}
-            >
+            <div key={id} className="opponent-block" data-protected={protectedCaller}>
               <div className="player-meta">
                 <strong>{names[id] ?? id}</strong>
                 <span className="meta-muted">
@@ -123,9 +115,7 @@ export function Table() {
       <div className="center-piles">
         <div className="pile">
           <span className="pile-label">Deck · {view.deckCount}</span>
-          <div className="card" data-known="false" aria-hidden>
-            <span className="card-back-mark">◆</span>
-          </div>
+          <CardFace asButton={false} />
         </div>
         <div className="pile">
           <span className="pile-label">
@@ -133,17 +123,11 @@ export function Table() {
             {view.discardTop?.key === 'HEAVEN' ? ' · heaven!' : ''}
           </span>
           {view.discardTop ? (
-            <div
-              className={
-                view.discardTop.key === 'HEAVEN' ? 'discard-heaven-glow' : undefined
-              }
-            >
+            <div className={view.discardTop.key === 'HEAVEN' ? 'discard-heaven-glow' : undefined}>
               <CardFace face={view.discardTop} asButton={false} />
             </div>
           ) : (
-            <div className="card" data-known="false" style={{ opacity: 0.4 }}>
-              <span className="card-back-mark">—</span>
-            </div>
+            <div className="card card-empty" aria-hidden />
           )}
         </div>
       </div>
@@ -160,10 +144,7 @@ export function Table() {
       )}
 
       {you && (
-        <div
-          className="you-block"
-          data-your-turn={view.turn?.playerId === viewerId}
-        >
+        <div className="you-block" data-your-turn={view.turn?.playerId === viewerId}>
           <div className="player-meta">
             <strong>You · {names[viewerId] ?? viewerId}</strong>
             <span className="meta-muted">

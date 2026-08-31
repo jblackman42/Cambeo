@@ -8,6 +8,7 @@ export type Action =
   | { type: 'DRAW_DISCARD'; playerId: PlayerId }
   | { type: 'DISCARD_DRAWN'; playerId: PlayerId }
   | { type: 'REPLACE_CARD'; playerId: PlayerId; slotIndex: number }
+  | { type: 'KEEP_DRAWN'; playerId: PlayerId }
   | { type: 'RESOLVE_POWER_TARGET'; playerId: PlayerId; target: PowerTarget }
   | {
       type: 'FLIP_ATTEMPT';

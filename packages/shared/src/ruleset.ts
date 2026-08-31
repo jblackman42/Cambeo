@@ -19,6 +19,8 @@ export const RuleSetSchema = z
     lossThreshold: z.number().int().min(1),
     minPlayers: z.number().int().min(2),
     maxPlayers: z.number().int().min(2),
+    heavenDiscardableAfterCambeo: z.boolean(),
+    hellDiscardOnlyOntoHeaven: z.boolean(),
   })
   .superRefine((data, ctx) => {
     for (const key of CARD_KEYS) {

@@ -34,8 +34,7 @@ export const MATCH_KEYS = [
   'J',
   'Q',
   'K',
-  'HEAVEN',
-  'HELL',
+  'JOKER',
 ] as const;
 
 export type MatchKey = (typeof MATCH_KEYS)[number];
@@ -62,9 +61,9 @@ export const CARD_KEY_TO_MATCH_KEY: Record<CardKey, MatchKey> = {
   Q_BLACK: 'Q',
   K_RED: 'K',
   K_BLACK: 'K',
-  // Distinct match keys until heaven/hell special rules are documented (spec 11.1).
-  HEAVEN: 'HEAVEN',
-  HELL: 'HELL',
+  // Both jokers share a match key so hell flips onto heaven (rank = joker).
+  HEAVEN: 'JOKER',
+  HELL: 'JOKER',
 };
 
 export function matchKeyFor(cardKey: CardKey): MatchKey {

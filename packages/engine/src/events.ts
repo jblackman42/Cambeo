@@ -10,13 +10,13 @@ export type GameEvent =
   | { type: 'TURN_STARTED'; playerId: PlayerId }
   | { type: 'CARD_DRAWN'; playerId: PlayerId; from: 'DECK' | 'DISCARD'; cardId: CardId }
   | { type: 'CARD_DISCARDED'; playerId: PlayerId; cardId: CardId; triggeredPower: PowerId | null }
-  | {
-      type: 'CARD_REPLACED';
+  | { type: 'CARD_REPLACED';
       playerId: PlayerId;
       newCardId: CardId;
       oldCardId: CardId;
       slotIndex: number;
     }
+  | { type: 'CARD_KEPT'; playerId: PlayerId; cardId: CardId }
   | { type: 'POWER_STARTED'; playerId: PlayerId; powerId: PowerId; sourceCardId: CardId }
   | {
       type: 'POWER_REVEAL';

@@ -53,4 +53,6 @@ export const HOUSE_RULES: RuleSet = {
   lossThreshold: 6,
   minPlayers: 3,
   maxPlayers: 8,
+  heavenDiscardableAfterCambeo: false,
+  hellDiscardOnlyOntoHeaven: true,
 };

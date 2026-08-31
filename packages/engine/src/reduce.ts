@@ -3,7 +3,7 @@ import type { Action } from './actions.js';
 import type { GameState } from './state.js';
 import { createRng, type Rng } from './rng.js';
 import { startGame, ackPeek, reject } from './setup.js';
-import { drawDeck, drawDiscard, discardDrawn, replaceCard } from './turn.js';
+import { drawDeck, drawDiscard, discardDrawn, replaceCard, keepDrawn } from './turn.js';
 import { resolvePowerTarget } from './powers.js';
 import { flipAttempt, giveCard } from './flip.js';
 import { callCambeo } from './cambeo.js';
@@ -34,6 +34,8 @@ export function reduce(
       return discardDrawn(state, action, ruleSet, rng);
     case 'REPLACE_CARD':
       return replaceCard(state, action, ruleSet, rng);
+    case 'KEEP_DRAWN':
+      return keepDrawn(state, action, ruleSet, rng);
     case 'RESOLVE_POWER_TARGET':
       return resolvePowerTarget(state, action, ruleSet, rng);
     case 'FLIP_ATTEMPT':

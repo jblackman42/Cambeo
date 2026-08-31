@@ -8,6 +8,7 @@ import { getCard, powerForCard, reject, withRng } from './setup.js';
 import { advanceAfterTurnAction } from './cambeo.js';
 import { maybeFlagLossThreshold } from './scoring.js';
 import { specialCardHooks } from './extensions/heavenHell.js';
+import { assertHellDiscardInvariant, canPlaceOnDiscard } from './jokers.js';
 
 /**
  * Draw from deck. If deck is empty, reshuffle discard (keeping top) into deck.
@@ -174,14 +175,18 @@ export function discardDrawn(
     return reject(state, action.playerId, 'DISCARD_DRAWN', 'No drawn card');
   }
 
+  const card = getCard(state, state.drawnCard);
+  const place = canPlaceOnDiscard(state, ruleSet, card.key);
+  if (!place.ok) {
+    return reject(state, action.playerId, 'DISCARD_DRAWN', place.reason);
+  }
+
   // A card drawn from the discard pile can never be used for its power.
   const fromDiscard = state.turn.drawnFrom === 'DISCARD';
   const cardId = state.drawnCard;
   const { powerId, definition } = powerForCard(state, ruleSet, cardId);
   const triggersPower = !fromDiscard && powerId !== 'NONE' && definition.steps.length > 0;
 
-  // EXTENSION POINT (spec 11.1)
-  const card = getCard(state, cardId);
   specialCardHooks.onPowerResolve(state, card.key, ruleSet, rng);
 
   const discard = [...state.discard, cardId];
@@ -201,6 +206,8 @@ export function discardDrawn(
     discardEpoch: state.discardEpoch + 1,
     flipWonForEpoch: null,
   };
+
+  assertHellDiscardInvariant(next, ruleSet);
 
   // Discard top is public.
   for (const pid of state.seating) {
@@ -261,6 +268,12 @@ export function replaceCard(
   }
 
   const oldCardId = player.hand[action.slotIndex]!;
+  const oldCard = getCard(state, oldCardId);
+  const place = canPlaceOnDiscard(state, ruleSet, oldCard.key);
+  if (!place.ok) {
+    return reject(state, action.playerId, 'REPLACE_CARD', place.reason);
+  }
+
   const newCardId = state.drawnCard;
   const newHand = [...player.hand];
   newHand[action.slotIndex] = newCardId;
@@ -288,12 +301,57 @@ export function replaceCard(
     flipWonForEpoch: null,
   };
 
+  assertHellDiscardInvariant(next, ruleSet);
+
   next = grantKnowledge(next, action.playerId, [newCardId]);
   for (const pid of state.seating) {
     next = grantKnowledge(next, pid, [oldCardId]);
   }
 
   next = { ...next, phase: 'TURN_DRAW' };
+  return advanceAfterTurnAction(withRng(next, rng, events), ruleSet, rng);
+}
+
+/**
+ * Keep the drawn card in hand and end the turn without touching the discard pile.
+ * Used when heaven is drawn during the final round and cannot be discarded/replaced away.
+ */
+export function keepDrawn(
+  state: GameState,
+  action: Extract<Action, { type: 'KEEP_DRAWN' }>,
+  ruleSet: RuleSet,
+  rng: Rng,
+): GameState {
+  if (state.phase === 'GIVE_CARD_PENDING') {
+    return reject(state, action.playerId, 'KEEP_DRAWN', 'Must give a card first');
+  }
+  if (state.phase !== 'TURN_CHOICE') {
+    return reject(state, action.playerId, 'KEEP_DRAWN', 'Not in choice phase');
+  }
+  if (!state.turn || state.turn.playerId !== action.playerId) {
+    return reject(state, action.playerId, 'KEEP_DRAWN', 'Not your turn');
+  }
+  if (!state.drawnCard) {
+    return reject(state, action.playerId, 'KEEP_DRAWN', 'No drawn card');
+  }
+
+  const cardId = state.drawnCard;
+  const added = addCardToHand(
+    { ...state, drawnCard: null },
+    action.playerId,
+    cardId,
+    ruleSet,
+  );
+  const events: GameEvent[] = [
+    { type: 'CARD_KEPT', playerId: action.playerId, cardId },
+  ];
+  if (added.thresholdEvent) events.push(added.thresholdEvent);
+
+  let next: GameState = {
+    ...added.state,
+    phase: 'TURN_DRAW',
+  };
+  next = grantKnowledge(next, action.playerId, [cardId]);
   return advanceAfterTurnAction(withRng(next, rng, events), ruleSet, rng);
 }
 

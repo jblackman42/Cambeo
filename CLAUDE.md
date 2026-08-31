@@ -24,7 +24,7 @@ Also: `Math.random` is banned in `packages/engine` and `packages/shared` (ESLint
 ```
 packages/shared   RuleSet zod schema, card keys, power ids, House Rules preset, view wire types
 packages/engine   Pure rules engine: reduce(state, action, ruleSet, rng) => state
-apps/web          (not yet) Next.js App Router
+apps/web          Next.js App Router hot-seat UI (drives engine directly)
 packages/server   (not yet) Cloudflare Worker + Durable Object
 docs/             Game rules + app spec
 ```
@@ -35,6 +35,7 @@ Stack: pnpm workspaces, Node 22 (see `.nvmrc`), TypeScript strict, vitest, ESLin
 
 ```bash
 pnpm install
+pnpm dev           # hot-seat UI at http://localhost:3000
 pnpm test          # vitest run
 pnpm test:watch
 pnpm typecheck
@@ -50,4 +51,6 @@ pnpm check         # typecheck + lint + test
 - Owns full authoritative state including every face-down card identity.
 - Emits `lastEvents` per action for later fan-out / animation.
 - Illegal actions do not throw; they return prior state with `ACTION_REJECTED`.
-- Heaven/hell special rules and loss-threshold elimination are unresolved (spec 11). See `packages/engine/src/extensions/heavenHell.ts` and skipped tests in `open-questions.test.ts`.
+- Heaven/hell special rules and loss-threshold elimination: heaven/hell are implemented
+  (see `jokers.ts` and RuleSet flags). Loss-threshold elimination remains unresolved
+  (spec 11). See skipped tests in `open-questions.test.ts`.

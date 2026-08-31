@@ -2,18 +2,10 @@ import { describe, it } from 'vitest';
 
 /**
  * Open questions from docs/cambeo-app-spec.md section 11.
- * These tests are skipped until the rules are documented.
- * Do not invent behavior to make them pass.
+ * Heaven/hell special rules are resolved (see heaven-hell.test.ts).
+ * Loss-threshold elimination remains open.
  */
 describe('open-questions', () => {
-  it.skip('heaven special rules unspecified (spec 11.1)', () => {
-    // EXTENSION POINT: implement when docs/cambeo-rules.md documents heaven rules
-  });
-
-  it.skip('hell special rules unspecified (spec 11.1)', () => {
-    // EXTENSION POINT: implement when docs/cambeo-rules.md documents hell rules
-  });
-
   it.skip('over-threshold player is removed from the turn order (spec 11.2 candidate A)', () => {
     // TODO(spec 11.2): choose elimination vs stay-in-play
   });

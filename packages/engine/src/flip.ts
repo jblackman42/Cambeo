@@ -7,6 +7,11 @@ import { grantKnowledge, grantKnowledgeToAll } from './knowledge.js';
 import { getCard, isCambeoCallerProtected, reject, withRng } from './setup.js';
 import { addCardToHand, drawFromDeck, removeCardFromHand } from './turn.js';
 import { specialCardHooks } from './extensions/heavenHell.js';
+import {
+  assertHellDiscardInvariant,
+  canPlaceOnDiscard,
+  hellFlipOntoDiscardLegal,
+} from './jokers.js';
 
 const FLIP_BLOCKED_PHASES = new Set(['SCORING', 'OVER', 'LOBBY']);
 
@@ -66,12 +71,24 @@ export function flipAttempt(
   const discardTopId = state.discard[state.discard.length - 1]!;
   const discardTop = getCard(state, discardTopId);
 
-  // EXTENSION POINT (spec 11.1)
   specialCardHooks.onFlipAttempt(state, flippedCard.key, ruleSet, rng);
+
+  const hellGate = hellFlipOntoDiscardLegal(state, ruleSet, flippedCard.key);
+  if (!hellGate.ok) {
+    return reject(state, action.playerId, 'FLIP_ATTEMPT', hellGate.reason);
+  }
 
   const match = matchKeyFor(flippedCard.key) === matchKeyFor(discardTop.key);
 
   if (match) {
+    // Successful flip places the card on discard — check place rules for heaven
+    // (hell onto heaven is the exception allowed by canPlaceOnDiscard's flip path).
+    if (flippedCard.key === 'HEAVEN') {
+      const place = canPlaceOnDiscard(state, ruleSet, 'HEAVEN');
+      if (!place.ok) {
+        return reject(state, action.playerId, 'FLIP_ATTEMPT', place.reason);
+      }
+    }
     return resolveSuccessfulFlip(state, action, flippedCardId, ruleSet, rng);
   }
   return resolveFailedFlip(state, action, flippedCardId, ruleSet, rng);
@@ -106,6 +123,8 @@ function resolveSuccessfulFlip(
     discardEpoch: newEpoch,
     flipWonForEpoch: newEpoch,
   };
+
+  assertHellDiscardInvariant(next, ruleSet);
 
   for (const pid of state.seating) {
     next = grantKnowledge(next, pid, [flippedCardId]);

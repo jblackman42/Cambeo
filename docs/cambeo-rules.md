@@ -30,9 +30,28 @@ Each card's point value is printed in the bottom right corner of the card. You n
 
 The jokers are optional and are toggled on or off before the game starts. When enabled they are shuffled into the deck and are dealt and drawn like any other card.
 
-> **TODO:** heaven and hell have additional special rules that are not yet documented here.
-
 Every value in this table is editable in the game settings before a game begins.
+
+---
+
+## Heaven and Hell
+
+### Heaven (red joker, −4)
+
+- Heaven can be discarded normally, like any other card, for as long as no one has called cambeo.
+- Once cambeo has been called, heaven can no longer be discarded. It cannot be played to the discard pile by any means during the final round. This exists to stop a player from dumping a −4 onto the pile for someone else to pick up in the last turns of the game.
+- Heaven can still be moved by a 10 or a J swap at any time, including during the final round. Swapping is not discarding.
+
+### Hell (black joker, +15)
+
+- Hell can never be discarded, with exactly one exception.
+- The only legal way to discard hell is to place it on top of heaven on the discard pile. Since flip matching is by rank, this is a normal correct flip: both cards are jokers.
+- Hell can still be moved by a 10 or a J swap at any time. Swapping is not discarding.
+- Because hell cannot be discarded, it also cannot be discarded to use a power. If a player draws hell from the deck, their only legal move is to replace one of their own cards with it.
+
+### Why this matters in play
+
+Heaven usually reaches the discard pile only by accident: a player replaces a card they do not know, and heaven is what turns face up. The next player will almost always take heaven straight off the discard pile, which keeps it in circulation and makes the window for dumping hell narrow and unpredictable.
 
 ---
 
@@ -124,6 +143,8 @@ The game is over at that point. Start a new one to play again.
 - Fewest points wins.
 - Red Queen is -1, red King is -2, heaven (red joker) is -4. These are the cards you want.
 - Hell (black joker) is +15. Get rid of it.
+- Heaven can be discarded until cambeo is called, then never again.
+- Hell can only ever be discarded by flipping it onto heaven.
 - Black face cards and 10s are 10 points each.
 - Powers only fire on cards drawn from the deck, never from the discard pile.
 - Flips match on rank only.

@@ -21,6 +21,11 @@ export { viewFor } from './view.js';
 export { knows, grantKnowledge, clearKnowledgeForCards } from './knowledge.js';
 export { computeScores, finishGame } from './scoring.js';
 export {
+  canPlaceOnDiscard,
+  assertHellDiscardInvariant,
+  cambeoCalled,
+} from './jokers.js';
+export {
   specialCardHooks,
   setSpecialCardHooks,
   noopSpecialCardHooks,

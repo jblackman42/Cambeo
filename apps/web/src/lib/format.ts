@@ -1,4 +1,4 @@
-import type { CardKey, Suit } from '@cambeo/shared';
+import type { CardKey, PowerId, Suit } from '@cambeo/shared';
 
 const SUIT_GLYPH: Record<Suit, string> = {
   hearts: '♥',
@@ -14,6 +14,52 @@ export function suitGlyph(suit: Suit): string {
 
 export function isRedSuit(suit: Suit): boolean {
   return suit === 'hearts' || suit === 'diamonds';
+}
+
+export function cardKeyLabel(key: CardKey): string {
+  switch (key) {
+    case 'Q_RED':
+      return 'Q red';
+    case 'Q_BLACK':
+      return 'Q black';
+    case 'K_RED':
+      return 'K red';
+    case 'K_BLACK':
+      return 'K black';
+    case 'HEAVEN':
+      return 'Heaven';
+    case 'HELL':
+      return 'Hell';
+    default:
+      return key;
+  }
+}
+
+export function powerLabel(id: PowerId | string): string {
+  switch (id) {
+    case 'NONE':
+      return 'None';
+    case 'PEEK_OWN':
+      return 'Peek own';
+    case 'PEEK_OTHER':
+      return 'Spy';
+    case 'BLIND_SWAP':
+      return 'Blind swap';
+    case 'LOOK_THEN_BLIND_SWAP':
+      return 'Look then swap';
+    case 'LOOK_THEN_OPTIONAL_SWAP':
+      return 'Look then optional swap';
+    case 'SHUFFLE_TARGET_HAND':
+      return 'Shuffle a hand';
+    default:
+      return id;
+  }
+}
+
+export function formatPoints(n: number): string {
+  if (n > 0) return `+${n}`;
+  if (n < 0) return `−${Math.abs(n)}`;
+  return '0';
 }
 
 export function rankLabel(key: CardKey): string {

@@ -1,6 +1,7 @@
 export * from './cards.js';
 export * from './powers.js';
 export * from './ruleset.js';
+export * from './ruleset-codec.js';
 export * from './presets.js';
 export * from './view.js';
 export * from './action.js';

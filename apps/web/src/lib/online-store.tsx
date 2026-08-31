@@ -4,20 +4,9 @@ import type { Action, PlayerId, RoomView, ServerMessage } from '@cambeo/shared';
 import { HOUSE_RULES } from '@cambeo/shared';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PlayProvider, deriveMode, type InteractionMode, type PlayStore } from '@/lib/play-context';
-import {
-  getSessionPlayerId,
-  getUsername,
-  setSessionPlayerId,
-  workerWsUrl,
-} from '@/lib/session';
+import { getSessionPlayerId, getUsername, setSessionPlayerId, workerWsUrl } from '@/lib/session';
 
-export function OnlineProvider({
-  roomCode,
-  children,
-}: {
-  roomCode: string;
-  children: ReactNode;
-}) {
+export function OnlineProvider({ roomCode, children }: { roomCode: string; children: ReactNode }) {
   const code = roomCode.toUpperCase();
   const [viewerId, setViewerId] = useState<PlayerId>('');
   const [room, setRoom] = useState<RoomView | null>(null);
@@ -28,39 +17,41 @@ export function OnlineProvider({
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
 
-  const applyServer = useCallback((msg: ServerMessage) => {
-    switch (msg.type) {
-      case 'welcome':
-        setViewerId(msg.playerId);
-        setSessionPlayerId(code, msg.playerId);
-        setLastError(null);
-        break;
-      case 'snapshot':
-      case 'room':
-        setRoom(msg.room);
-        if (msg.room.game) {
-          setMode(deriveMode(msg.room.game, msg.room.you.playerId));
-        }
-        break;
-      case 'state':
-        setRoom((prev) =>
-          prev
-            ? { ...prev, seq: msg.seq, game: msg.view, lastEvents: msg.lastEvents }
-            : prev,
-        );
-        setMode(deriveMode(msg.view, msg.view.viewerId));
-        setLastReject(null);
-        break;
-      case 'rejected':
-        setLastReject(msg.reason);
-        break;
-      case 'error':
-        setLastError(msg.message);
-        break;
-      case 'pong':
-        break;
-    }
-  }, [code]);
+  const applyServer = useCallback(
+    (msg: ServerMessage) => {
+      switch (msg.type) {
+        case 'welcome':
+          setViewerId(msg.playerId);
+          setSessionPlayerId(code, msg.playerId);
+          setLastError(null);
+          break;
+        case 'snapshot':
+        case 'room':
+          setRoom(msg.room);
+          setLastError(null);
+          if (msg.room.game) {
+            setMode(deriveMode(msg.room.game, msg.room.you.playerId));
+          }
+          break;
+        case 'state':
+          setRoom((prev) =>
+            prev ? { ...prev, seq: msg.seq, game: msg.view, lastEvents: msg.lastEvents } : prev,
+          );
+          setMode(deriveMode(msg.view, msg.view.viewerId));
+          setLastReject(null);
+          break;
+        case 'rejected':
+          setLastReject(msg.reason);
+          break;
+        case 'error':
+          setLastError(msg.message);
+          break;
+        case 'pong':
+          break;
+      }
+    },
+    [code],
+  );
 
   useEffect(() => {
     let stopped = false;
@@ -140,7 +131,7 @@ export function OnlineProvider({
 
   const value: PlayStore = {
     playMode: 'online',
-    ruleSet: view?.ruleSet ?? HOUSE_RULES,
+    ruleSet: room?.ruleSet ?? HOUSE_RULES,
     viewerId: effectiveViewer,
     names,
     view,
@@ -154,6 +145,7 @@ export function OnlineProvider({
     isHost: room?.hostId === effectiveViewer,
     playersList: room?.players ?? [],
     startGame: () => send({ type: 'start' }),
+    applyRules: (next) => send({ type: 'setRules', ruleSet: next }),
     resetLobby: null,
     wsStatus,
     lastError,

@@ -2,21 +2,31 @@
 
 import { useState } from 'react';
 import { useGame } from '@/lib/game-store';
+import { RulesSummary } from '@/components/RulesSummary';
+import { SettingsPanel } from '@/components/SettingsPanel';
+import { validateForTable } from '@cambeo/shared';
 
 const DEFAULT_NAMES = ['Alex', 'Blair', 'Casey'];
 
 export function Lobby() {
   const { ruleSet, resetLobby } = useGame();
-  if (!resetLobby) return null;
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  if (!resetLobby) return null;
 
-  const canStart = names.length >= ruleSet.minPlayers && names.every((n) => n.trim().length > 0);
+  const table = validateForTable(ruleSet, names.length);
+  const canStart =
+    table.ok && names.length >= ruleSet.minPlayers && names.every((n) => n.trim().length > 0);
+
+  if (settingsOpen) {
+    return <SettingsPanel onClose={() => setSettingsOpen(false)} />;
+  }
 
   return (
     <div className="panel">
       <h2>Hot-seat lobby</h2>
       <p className="brand-sub" style={{ marginBottom: '1rem' }}>
-        One device, pass it around. House Rules. No server.
+        One device, pass it around. No server.
       </p>
 
       <div className="lobby-list">
@@ -53,6 +63,9 @@ export function Lobby() {
         >
           Add player
         </button>
+        <button type="button" className="btn btn-ghost" onClick={() => setSettingsOpen(true)}>
+          Settings
+        </button>
         <button
           type="button"
           className="btn btn-primary"
@@ -63,23 +76,7 @@ export function Lobby() {
         </button>
       </div>
 
-      <h2>Rules</h2>
-      <dl className="rules-summary">
-        <dt>Hand</dt>
-        <dd>
-          {ruleSet.handSize} cards, peek {ruleSet.initialRevealCount} at start
-        </dd>
-        <dt>Jokers</dt>
-        <dd>{ruleSet.jokers ? 'Heaven (−4) and Hell (+15) on' : 'Off'}</dd>
-        <dt>Loss threshold</dt>
-        <dd>More than {ruleSet.lossThreshold} cards (flagged only — open question)</dd>
-        <dt>Powers</dt>
-        <dd>6–7 peek own · 8–9 spy · 10 blind swap · J look then swap</dd>
-        <dt>Players</dt>
-        <dd>
-          {ruleSet.minPlayers}–{ruleSet.maxPlayers}
-        </dd>
-      </dl>
+      <RulesSummary ruleSet={ruleSet} playerCount={names.length} />
     </div>
   );
 }

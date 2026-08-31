@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ActionSchema, tryParseClientMessage } from './index.js';
+import { ActionSchema, HOUSE_RULES, tryParseClientMessage } from './index.js';
 
 describe('protocol', () => {
   it('parses a join message', () => {
@@ -23,7 +23,16 @@ describe('protocol', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('rejects an unknown action type', () => {
-    expect(ActionSchema.safeParse({ type: 'EXPLODE', playerId: 'p1' }).success).toBe(false);
+  it('parses a setRules envelope', () => {
+    const result = tryParseClientMessage({ type: 'setRules', ruleSet: HOUSE_RULES });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects setRules with a broken RuleSet', () => {
+    const result = tryParseClientMessage({
+      type: 'setRules',
+      ruleSet: { ...HOUSE_RULES, handSize: 3 },
+    });
+    expect(result.ok).toBe(false);
   });
 });

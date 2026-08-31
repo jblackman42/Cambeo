@@ -1,6 +1,10 @@
 import { z } from 'zod';
-import { CARD_KEYS, deckSizeFromComposition, type CardKey } from './cards.js';
+import { CARD_KEYS, deckComposition, deckSizeFromComposition, type CardKey } from './cards.js';
 import { POWER_IDS, type PowerId } from './powers.js';
+
+/** Bounds the settings form and the schema share. Spec §3.1: hand size 4–6. */
+export const HAND_SIZE_MIN = 4;
+export const HAND_SIZE_MAX = 6;
 
 const cardKeySchema = z.enum(CARD_KEYS);
 const powerIdSchema = z.enum(POWER_IDS);
@@ -14,7 +18,7 @@ export const RuleSetSchema = z
     jokers: z.boolean(),
     values: valuesSchema,
     powers: powersSchema,
-    handSize: z.number().int().min(1).max(6),
+    handSize: z.number().int().min(HAND_SIZE_MIN).max(HAND_SIZE_MAX),
     initialRevealCount: z.number().int().min(0),
     lossThreshold: z.number().int().min(1),
     minPlayers: z.number().int().min(2),
@@ -129,4 +133,41 @@ export function cardPower(ruleSet: RuleSet, key: CardKey): PowerId {
     throw new Error(`Missing power for card key ${key}`);
   }
   return power;
+}
+
+export interface DeckSummary {
+  cardCount: number;
+  minCardValue: number;
+  maxCardValue: number;
+  poweredCardCount: number;
+  minHand: number;
+  maxHand: number;
+}
+
+/** Live feedback for the settings form: composition, value range, powers, hand extrema. */
+export function summarizeDeck(ruleSet: RuleSet): DeckSummary {
+  const values: number[] = [];
+  let poweredCardCount = 0;
+  for (const slot of deckComposition(ruleSet.jokers)) {
+    const value = cardValue(ruleSet, slot.key);
+    const powered = cardPower(ruleSet, slot.key) !== 'NONE';
+    for (let i = 0; i < slot.suits.length; i++) {
+      values.push(value);
+      if (powered) poweredCardCount += 1;
+    }
+  }
+
+  values.sort((a, b) => a - b);
+  const n = Math.min(ruleSet.handSize, values.length);
+  const minHand = values.slice(0, n).reduce((sum, v) => sum + v, 0);
+  const maxHand = values.slice(values.length - n).reduce((sum, v) => sum + v, 0);
+
+  return {
+    cardCount: values.length,
+    minCardValue: values[0] ?? 0,
+    maxCardValue: values[values.length - 1] ?? 0,
+    poweredCardCount,
+    minHand,
+    maxHand,
+  };
 }

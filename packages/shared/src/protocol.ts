@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ActionSchema, type Action } from './action.js';
 import type { GameEvent } from './events.js';
+import { RuleSetSchema, type RuleSet } from './ruleset.js';
 import type { PlayerId, RedactedGameView } from './view.js';
 
 export const DEFAULT_TURN_TIMEOUT_MS = 45_000;
@@ -13,7 +14,8 @@ export type RoomErrorCode =
   | 'NOT_HOST'
   | 'NEED_PLAYERS'
   | 'UNKNOWN_PLAYER'
-  | 'SPOOFED_PLAYER';
+  | 'SPOOFED_PLAYER'
+  | 'INVALID_RULES';
 
 export interface RoomPlayerInfo {
   playerId: PlayerId;
@@ -29,6 +31,7 @@ export interface RoomView {
   turnTimeoutMs: number;
   you: { playerId: PlayerId; name: string };
   players: RoomPlayerInfo[];
+  ruleSet: RuleSet;
   game: RedactedGameView | null;
   lastEvents: GameEvent[];
 }
@@ -37,6 +40,7 @@ export type ClientMessage =
   | { type: 'join'; name: string; playerId?: PlayerId }
   | { type: 'leave' }
   | { type: 'start' }
+  | { type: 'setRules'; ruleSet: RuleSet }
   | { type: 'action'; action: Action }
   | { type: 'heartbeat' };
 
@@ -48,6 +52,7 @@ export const ClientMessageSchema: z.ZodType<ClientMessage> = z.discriminatedUnio
   }),
   z.object({ type: z.literal('leave') }),
   z.object({ type: z.literal('start') }),
+  z.object({ type: z.literal('setRules'), ruleSet: RuleSetSchema }),
   z.object({ type: z.literal('action'), action: ActionSchema }),
   z.object({ type: z.literal('heartbeat') }),
 ]);

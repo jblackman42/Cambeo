@@ -2,14 +2,9 @@
 
 import type { Action, PlayerId } from '@cambeo/engine';
 import { createGame, createRng, reduce, viewFor } from '@cambeo/engine';
-import { HOUSE_RULES, type RedactedGameView, type RuleSet } from '@cambeo/shared';
+import { HOUSE_RULES, cloneRuleSet, type RedactedGameView, type RuleSet } from '@cambeo/shared';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import {
-  PlayProvider,
-  deriveMode,
-  type InteractionMode,
-  type PlayStore,
-} from '@/lib/play-context';
+import { PlayProvider, deriveMode, type InteractionMode, type PlayStore } from '@/lib/play-context';
 
 function makeIds(names: string[]): { ids: PlayerId[]; nameMap: Record<PlayerId, string> } {
   const ids = names.map((_, i) => `p${i + 1}`);
@@ -20,8 +15,14 @@ function makeIds(names: string[]): { ids: PlayerId[]; nameMap: Record<PlayerId, 
   return { ids, nameMap };
 }
 
-export function GameProvider({ children }: { children: ReactNode }) {
-  const [ruleSet] = useState<RuleSet>(HOUSE_RULES);
+export function GameProvider({
+  children,
+  initialRuleSet = HOUSE_RULES,
+}: {
+  children: ReactNode;
+  initialRuleSet?: RuleSet;
+}) {
+  const [ruleSet, setRuleSet] = useState<RuleSet>(() => cloneRuleSet(initialRuleSet));
   const [state, setState] = useState<import('@cambeo/engine').GameState | null>(null);
   const [viewerId, setViewerId] = useState<PlayerId>('p1');
   const [names, setNames] = useState<Record<PlayerId, string>>({});
@@ -69,6 +70,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [ruleSet],
   );
 
+  const applyRules = useCallback((next: RuleSet) => {
+    setRuleSet(cloneRuleSet(next));
+  }, []);
+
   const view = useMemo<RedactedGameView | null>(() => {
     if (!state) return null;
     return viewFor(state, viewerId, ruleSet);
@@ -98,6 +103,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       isHost: i === 0,
     })),
     startGame: () => undefined,
+    applyRules,
     resetLobby,
     wsStatus: 'idle',
     lastError: null,

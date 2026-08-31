@@ -2,6 +2,7 @@
 
 import { CardFace } from '@/components/CardFace';
 import { useGame } from '@/lib/play-context';
+import { isHouseRules } from '@cambeo/shared';
 
 export function Scoring() {
   const { view, names, rematch, ruleSet, playMode } = useGame();
@@ -22,11 +23,7 @@ export function Scoring() {
 
       <div className="scoring-grid">
         {view.seating.map((id) => (
-          <div
-            key={id}
-            className="score-row"
-            data-winner={winnerIds.includes(id)}
-          >
+          <div key={id} className="score-row" data-winner={winnerIds.includes(id)}>
             <div className="score-head">
               <span>
                 {names[id] ?? id}
@@ -47,7 +44,7 @@ export function Scoring() {
       {playMode === 'hotseat' && (
         <div className="btn-row" style={{ marginTop: '1rem' }}>
           <button type="button" className="btn btn-primary" onClick={rematch}>
-            Rematch (same players, {ruleSet.jokers ? 'House Rules' : 'rules'})
+            Rematch (same players, {isHouseRules(ruleSet) ? 'House Rules' : 'custom rules'})
           </button>
         </div>
       )}

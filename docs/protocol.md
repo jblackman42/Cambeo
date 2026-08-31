@@ -21,6 +21,7 @@ Room codes are 5 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 | `join` | `name`, `playerId?` | Omit `playerId` for a new seat. Send it to reconnect. |
 | `leave` | | Lobby: drop from roster. In-game: disconnect only. |
 | `start` | | Host only. Needs `RuleSet.minPlayers`. |
+| `setRules` | `ruleSet` | Host only, lobby only. Locked after `start`. Invalid schema is `BAD_MESSAGE`. |
 | `action` | `action` (engine `Action`) | `action.playerId` must match the socket. `START_GAME` is not accepted here; use `start`. |
 | `heartbeat` | | Replies `pong`. |
 
@@ -33,10 +34,10 @@ Room codes are 5 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 | `room` | Roster / connection changes |
 | `state` | After a successful `reduce` — **this recipient’s** redacted view + `lastEvents` |
 | `rejected` | Illegal engine action — **sender only**; others keep the previous seq |
-| `error` | Protocol / room errors (`ROOM_FULL`, `GAME_IN_PROGRESS`, `NOT_HOST`, …) |
+| `error` | Protocol / room errors (`ROOM_FULL`, `GAME_IN_PROGRESS`, `NOT_HOST`, `INVALID_RULES`, …) |
 | `pong` | Heartbeat reply |
 
-Every `state` / `snapshot.game` is redacted for that player. Face-down identities the viewer does not know are never sent (`known: false` slots have no `key`). `POWER_REVEAL` identity is stripped for non-peekers. Drawn-card identity is only on the drawer’s view.
+`RoomView.ruleSet` is the room’s current config (lobby and in-game). Every `state` / `snapshot.game` is redacted for that player. Face-down identities the viewer does not know are never sent (`known: false` slots have no `key`). `POWER_REVEAL` identity is stripped for non-peekers. Drawn-card identity is only on the drawer’s view.
 
 ## Flip race
 

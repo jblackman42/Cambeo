@@ -49,7 +49,7 @@ export interface HandleResult {
 
 export class RoomController {
   readonly roomCode: string;
-  readonly ruleSet: RuleSet;
+  ruleSet: RuleSet;
   readonly turnTimeoutMs: number;
   private readonly deps: RoomDeps;
 
@@ -62,7 +62,11 @@ export class RoomController {
 
   private readonly conns = new Map<string, { playerId: PlayerId | null }>();
 
-  constructor(roomCode: string, deps: RoomDeps, opts?: { ruleSet?: RuleSet; turnTimeoutMs?: number }) {
+  constructor(
+    roomCode: string,
+    deps: RoomDeps,
+    opts?: { ruleSet?: RuleSet; turnTimeoutMs?: number },
+  ) {
     this.roomCode = roomCode;
     this.deps = deps;
     this.ruleSet = opts?.ruleSet ?? HOUSE_RULES;
@@ -174,11 +178,48 @@ export class RoomController {
         return this.leave(connId);
       case 'start':
         return this.start(connId);
+      case 'setRules':
+        return this.setRules(connId, msg.ruleSet);
       case 'action':
         return this.clientAction(connId, msg.action);
       case 'heartbeat':
         return this.heartbeat(connId);
     }
+  }
+
+  private setRules(connId: string, ruleSet: RuleSet): HandleResult {
+    const playerId = this.boundPlayer(connId);
+    if (!playerId) {
+      return this.result([this.errorTo(connId, 'NOT_JOINED', 'Not joined')], false);
+    }
+    if (playerId !== this.hostId) {
+      return this.result(
+        [this.errorTo(connId, 'NOT_HOST', 'Only the host can change rules')],
+        false,
+      );
+    }
+    if (this.game) {
+      return this.result(
+        [this.errorTo(connId, 'GAME_IN_PROGRESS', 'Rules are locked once the game starts')],
+        false,
+      );
+    }
+    if (this.players.length > ruleSet.maxPlayers) {
+      return this.result(
+        [
+          this.errorTo(
+            connId,
+            'INVALID_RULES',
+            `Already have ${this.players.length} players (max ${ruleSet.maxPlayers})`,
+          ),
+        ],
+        false,
+      );
+    }
+
+    this.ruleSet = ruleSet;
+    this.bumpSeq();
+    return this.result(this.fanoutRoom(), true);
   }
 
   private join(connId: string, name: string, requestedId?: PlayerId): HandleResult {
@@ -200,7 +241,13 @@ export class RoomController {
 
     if (this.game) {
       return this.result(
-        [this.errorTo(connId, requestedId ? 'UNKNOWN_PLAYER' : 'GAME_IN_PROGRESS', 'Game already started')],
+        [
+          this.errorTo(
+            connId,
+            requestedId ? 'UNKNOWN_PLAYER' : 'GAME_IN_PROGRESS',
+            'Game already started',
+          ),
+        ],
         false,
       );
     }
@@ -257,20 +304,11 @@ export class RoomController {
       return this.result([this.errorTo(connId, 'NOT_HOST', 'Only the host can start')], false);
     }
     if (this.game) {
-      return this.result(
-        [this.errorTo(connId, 'GAME_IN_PROGRESS', 'Game already started')],
-        false,
-      );
+      return this.result([this.errorTo(connId, 'GAME_IN_PROGRESS', 'Game already started')], false);
     }
     if (this.players.length < this.ruleSet.minPlayers) {
       return this.result(
-        [
-          this.errorTo(
-            connId,
-            'NEED_PLAYERS',
-            `Need at least ${this.ruleSet.minPlayers} players`,
-          ),
-        ],
+        [this.errorTo(connId, 'NEED_PLAYERS', `Need at least ${this.ruleSet.minPlayers} players`)],
         false,
       );
     }
@@ -283,7 +321,17 @@ export class RoomController {
     const rejected = game.lastEvents.find((e) => e.type === 'ACTION_REJECTED');
     if (rejected && rejected.type === 'ACTION_REJECTED') {
       return this.result(
-        [{ connId, message: { type: 'rejected', seq: this.seq, actionType: 'START_GAME', reason: rejected.reason } }],
+        [
+          {
+            connId,
+            message: {
+              type: 'rejected',
+              seq: this.seq,
+              actionType: 'START_GAME',
+              reason: rejected.reason,
+            },
+          },
+        ],
         false,
       );
     }
@@ -407,6 +455,7 @@ export class RoomController {
         connected: this.isConnected(p.playerId),
         isHost: p.playerId === this.hostId,
       })),
+      ruleSet: this.ruleSet,
       game: view,
       lastEvents: view?.lastEvents ?? [],
     };

@@ -26,6 +26,7 @@ export interface PlayStore {
   isHost: boolean;
   playersList: RoomPlayerInfo[];
   startGame: () => void;
+  applyRules: (ruleSet: RuleSet) => void;
   resetLobby: ((names: string[]) => void) | null;
   wsStatus: 'idle' | 'connecting' | 'open' | 'closed' | 'error';
   lastError: string | null;
@@ -33,13 +34,7 @@ export interface PlayStore {
 
 const PlayContext = createContext<PlayStore | null>(null);
 
-export function PlayProvider({
-  value,
-  children,
-}: {
-  value: PlayStore;
-  children: ReactNode;
-}) {
+export function PlayProvider({ value, children }: { value: PlayStore; children: ReactNode }) {
   return <PlayContext.Provider value={value}>{children}</PlayContext.Provider>;
 }
 

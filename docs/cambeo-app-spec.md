@@ -38,10 +38,10 @@ Locked the moment the game starts. See section 3.
 - Each opponent's hand rendered around the table with name, card count, and connection state.
 - Deck and discard pile in the center, discard showing its top card face up.
 - Turn indicator and a clear "it's your turn" state.
-- Draw prompt, then the discard-or-replace choice.
+- Draw prompt, then the discard / replace / keep choice.
 - Power prompt with targeting UI, generated from the power's target requirements.
 - Call Cambeo button, enabled only on your turn before you draw.
-- Any card on the table is tappable at any time to attempt a flip.
+- Flip input is arm-then-commit: first tap arms a card locally, second tap on that same card sends `FLIP_ATTEMPT`. A single tap never flips. See section 6.
 - Give-a-card prompt after a successful flip on an opponent.
 - Event log of public actions, scrollable, so players can reconstruct what just happened.
 
@@ -112,7 +112,7 @@ reduce(state: GameState, action: Action, ruleSet: RuleSet, rng: Rng): GameState
 
 **Actions:** `DRAW_DECK`, `DRAW_DISCARD`, `DISCARD_DRAWN`, `REPLACE_CARD`, `KEEP_DRAWN`, `RESOLVE_POWER_TARGET`, `FLIP_ATTEMPT`, `GIVE_CARD`, `CALL_CAMBEO`, `PASS_TURN`.
 
-`KEEP_DRAWN` adds the drawn card to the player's hand and ends the turn without putting anything on the discard pile. It exists so a player who draws heaven during the final round (when heaven cannot be discarded or replaced onto the pile) can still finish their turn holding it.
+`KEEP_DRAWN` adds the drawn card to the player's hand and ends the turn without putting anything on the discard pile. It is a normal third choice after drawing (alongside discard and replace), typically used to hold a late-game negative without giving up an existing card. It is also the only legal finish when heaven is drawn during the final round and cannot be discarded or replaced onto the pile.
 
 **Phases:** `LOBBY`, `INITIAL_PEEK`, `TURN_DRAW`, `TURN_CHOICE`, `POWER_TARGETING`, `GIVE_CARD_PENDING`, `FINAL_ROUND`, `SCORING`, `OVER`.
 
@@ -172,16 +172,59 @@ The engine tracks a per-player "knowledge set" of card ids so that a peeked card
 
 ## 6. Client Requirements
 
+Look and motion are specified in [`cambeo-design.md`](cambeo-design.md). That document wins over generic UI defaults.
+
 - Mobile first. Portrait layout, tap targets sized for thumbs, no hover-dependent affordances.
 - Every card shows its point value in the bottom right, per house rules, and that value comes from the room's config, not from a hardcoded map. The card art is a static asset; the value badge is a separate overlay layer rendered on top of it. See section 7.
 - Card flips, draws, and swaps are animated enough to be legible. Players need to see what happened to whose cards, since the whole game is watching and remembering.
 - Prompts are generated from power definitions, so a new power in the registry needs no new UI.
-- Clear affordance distinguishing "tap to flip" from "tap to select as swap target" while a power is resolving.
 - Sound or haptic cue on a successful flip against you, since flips happen off-turn and are easy to miss.
 - Event log so a player who looked away can catch up.
-- When a player draws hell, the discard-or-replace prompt must show only replace, with a short explanation of why. Do not present a disabled discard button with no reason.
+- After drawing, the prompt offers discard, replace, and keep. Keep adds the card to the hand without touching the discard pile.
+- When a player draws hell, the prompt must show only replace, with a short explanation of why. Do not present a disabled discard button with no reason. If the hand is empty (nothing to replace), show keep instead.
 - Same for heaven during the final round: show only the legal options (`KEEP_DRAWN`, and replace only if that would not put heaven on the pile — under House Rules, replace is also illegal, so keep-only with explanation).
 - Heaven sitting on top of the discard pile is a high-signal game state. Give it a visible treatment so nobody misses the flip window for hell.
+
+### 6.1 Persistent action bar
+
+A bar pinned above the player's hand, visible whenever any action is pending (and when a flip is armed), showing:
+
+- The power or action name
+- A step counter when there is more than one step
+- A plain-language instruction for the current step
+- A cancel button where the power or local mode permits backing out
+
+During targeting, non-legal cards are dimmed and desaturated; legal targets stay bright with a gold pulse. The current step must be readable without reconstructing it from the table.
+
+When a card is armed, the bar names the discard rank: "Tap again to flip. Discard shows a 7."
+
+### 6.2 Flip input routing
+
+Single-tap flipping is not used. A flip is two taps on the same card: arm (local, no network), then commit (`FLIP_ATTEMPT`). Tapping elsewhere, tapping a different card, cancel, or a 4-second timeout disarms with no penalty.
+
+The armed state is never sent to the server or shown to other players.
+
+While the local player has an open action of their own, taps are routed exclusively to targeting. Flip is unreachable.
+
+| Local phase | Tap on your card | Tap on opponent card |
+| --- | --- | --- |
+| Idle, not your turn | Arm / commit flip | Arm / commit flip |
+| Your turn, `TURN_DRAW` | No-op | No-op |
+| `TURN_CHOICE` | Select replace slot | No-op |
+| `POWER_TARGETING` | Select target, if legal for this step | Select target, if legal for this step |
+| `GIVE_CARD_PENDING` | Select card to give | No-op |
+| After you called cambeo | No-op | No-op |
+| Opponent's card, they called cambeo | No-op, shake | No-op, shake |
+
+Every no-op still gives feedback (shake or dim pulse).
+
+If the player arms a card whose identity they know, and it does not match the discard, the commit tap raises a confirmation naming both cards and the penalty. Unknown cards and known matches commit on the second tap. The confirmation may be skipped for the rest of the game via a checkbox.
+
+### 6.3 Penalty explanation
+
+A wrong flip is never silent. Show a message naming the flipped card, the discard pile's top card, and the consequence, held at least 2.5 seconds and dismissible early by tap. Mirror the same sentence into the event log.
+
+Losing a flip race (`FLIP_ATTEMPT` rejected because the discard was already won) is not a mistake: return the card to rest with a plain fade and no error styling.
 
 ---
 
@@ -264,7 +307,8 @@ Do **not** inline the SVGs into the bundle. Do not load face cards lazily on fir
 - Heaven and hell are shuffled into the deck and can be dealt and drawn like any other card.
 - Heaven may be discarded normally until cambeo is called. After cambeo, heaven cannot be discarded by any means during the final round (config: `heavenDiscardableAfterCambeo`, House Rules default `false`). Swaps may still move heaven.
 - Hell may never be discarded except by a correct flip onto heaven (config: `hellDiscardOnlyOntoHeaven`, House Rules default `true`). Drawing hell from the deck allows replace only, not discard-for-power. Swaps may still move hell.
-- A player who draws heaven during the final round ends the turn with `KEEP_DRAWN` (adds it to hand, puts nothing on discard).
+- After drawing, a player may discard, replace a card, or `KEEP_DRAWN` (add the card to hand, put nothing on discard).
+- A player who draws heaven during the final round must `KEEP_DRAWN` if they cannot legally put heaven on the pile.
 - When the deck runs out, the discard pile is shuffled and becomes the new deck.
 - A correct flip on another player's card **requires** giving them a card. With zero cards in hand, the target draws a blind card from the deck instead.
 - Reaching zero cards does not end or win the game. That player keeps playing and may call cambeo or keep drawing for negatives.

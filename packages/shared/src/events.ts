@@ -46,6 +46,13 @@ export type GameEvent =
   | { type: 'POWER_COMPLETED'; playerId: PlayerId; powerId: PowerId }
   | { type: 'POWER_DECLINED_SWAP'; playerId: PlayerId }
   | {
+      type: 'POWER_STEP_SKIPPED';
+      playerId: PlayerId;
+      powerId: PowerId;
+      stepIndex: number;
+      reason: string;
+    }
+  | {
       type: 'FLIP_SUCCESS';
       playerId: PlayerId;
       targetPlayerId: PlayerId;

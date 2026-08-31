@@ -3,7 +3,7 @@
 import type { GameEvent } from '@cambeo/shared';
 import { useGame } from '@/lib/play-context';
 
-function describe(event: GameEvent, names: Record<string, string>): string {
+function describe(event: GameEvent, names: Record<string, string>, discardKey?: string): string {
   const n = (id: string) => names[id] ?? id;
   switch (event.type) {
     case 'ACTION_REJECTED':
@@ -20,6 +20,8 @@ function describe(event: GameEvent, names: Record<string, string>): string {
       return `${n(event.playerId)} discarded${event.triggeredPower ? ` (${event.triggeredPower})` : ''}`;
     case 'CARD_REPLACED':
       return `${n(event.playerId)} replaced a card`;
+    case 'CARD_KEPT':
+      return `${n(event.playerId)} kept the drawn card`;
     case 'POWER_STARTED':
       return `${n(event.playerId)} power: ${event.powerId}`;
     case 'POWER_REVEAL':
@@ -30,10 +32,15 @@ function describe(event: GameEvent, names: Record<string, string>): string {
       return `${n(event.playerId)} shuffled ${n(event.targetPlayerId)}`;
     case 'POWER_COMPLETED':
       return `Power done`;
+    case 'POWER_STEP_SKIPPED':
+      return `${n(event.playerId)} skipped a power step — ${event.reason.toLowerCase()}`;
     case 'FLIP_SUCCESS':
       return `${n(event.playerId)} flipped ${event.key} on ${n(event.targetPlayerId)}`;
-    case 'FLIP_FAIL':
-      return `${n(event.playerId)} missed a flip`;
+    case 'FLIP_FAIL': {
+      return discardKey
+        ? `${n(event.playerId)} missed a flip — ${event.key} onto ${discardKey}. Penalty card.`
+        : `${n(event.playerId)} missed a flip`;
+    }
     case 'PENALTY_DRAWN':
       return `${n(event.playerId)} drew a penalty`;
     case 'GIVE_REQUIRED':
@@ -69,7 +76,9 @@ export function EventLog() {
           {events.length === 0 ? (
             <li>Waiting…</li>
           ) : (
-            events.map((e, i) => <li key={`${e.type}-${i}`}>{describe(e, names)}</li>)
+            events.map((e, i) => (
+              <li key={`${e.type}-${i}`}>{describe(e, names, view.discardTop?.key)}</li>
+            ))
           )}
         </ul>
       </div>

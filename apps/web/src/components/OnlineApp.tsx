@@ -1,6 +1,7 @@
 'use client';
 
 import { CardArtPreloader } from '@/components/CardArtPreloader';
+import { MuteToggle } from '@/components/MuteToggle';
 import { OnlineLobby } from '@/components/OnlineLobby';
 import { Table } from '@/components/Table';
 import { useGame } from '@/lib/play-context';
@@ -12,13 +13,16 @@ function Shell() {
   return (
     <div className="app-shell">
       <CardArtPreloader />
-      <header>
-        <h1 className="brand">Cambeo</h1>
-        <p className="brand-sub">
-          {roomCode ? `Room ${roomCode}` : 'Online'}
-          {wsStatus === 'connecting' ? ' · connecting…' : ''}
-          {wsStatus === 'closed' ? ' · reconnecting…' : ''}
-        </p>
+      <header className="chrome-row">
+        <div>
+          <h1 className="brand">Cambeo</h1>
+          <p className="brand-sub">
+            {roomCode ? `Room ${roomCode}` : 'Online'}
+            {wsStatus === 'connecting' ? ' · connecting…' : ''}
+            {wsStatus === 'closed' ? ' · reconnecting…' : ''}
+          </p>
+        </div>
+        <MuteToggle />
       </header>
       {lastError && !view && <div className="reject-toast">{lastError}</div>}
       {!view ? <OnlineLobby /> : <Table />}

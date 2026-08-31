@@ -314,7 +314,8 @@ export function replaceCard(
 
 /**
  * Keep the drawn card in hand and end the turn without touching the discard pile.
- * Used when heaven is drawn during the final round and cannot be discarded/replaced away.
+ * Third choice after a draw (alongside discard and replace). Also the fallback
+ * when heaven is drawn during the final round and cannot be discarded or replaced away.
  */
 export function keepDrawn(
   state: GameState,

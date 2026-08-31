@@ -13,7 +13,22 @@ import {
   hellFlipOntoDiscardLegal,
 } from './jokers.js';
 
-const FLIP_BLOCKED_PHASES = new Set(['SCORING', 'OVER', 'LOBBY']);
+const FLIP_BLOCKED_PHASES = new Set(['SCORING', 'OVER', 'LOBBY', 'INITIAL_PEEK']);
+
+function actorHasPendingAction(state: GameState, playerId: string): boolean {
+  if (state.phase === 'GIVE_CARD_PENDING') {
+    return state.pendingGive?.flipperId === playerId;
+  }
+  if (state.phase === 'POWER_TARGETING') {
+    return state.pendingPower?.playerId === playerId;
+  }
+  if (state.turn?.playerId !== playerId) return false;
+  if (state.phase === 'TURN_CHOICE') return true;
+  if ((state.phase === 'TURN_DRAW' || state.phase === 'FINAL_ROUND') && !state.turn.hasDrawn) {
+    return true;
+  }
+  return false;
+}
 
 export function flipAttempt(
   state: GameState,
@@ -42,19 +57,15 @@ export function flipAttempt(
     return reject(state, action.playerId, 'FLIP_ATTEMPT', 'Flip already won for this discard');
   }
 
-  // Cannot flip on your own discard during your own turn.
-  // After discarding for a power, phase is POWER_TARGETING and it is still your turn.
-  const ownDiscardOnOwnTurn =
-    state.turn?.playerId === action.playerId &&
-    state.phase === 'POWER_TARGETING' &&
-    state.pendingPower?.playerId === action.playerId;
-
-  if (ownDiscardOnOwnTurn) {
+  // Flips are suppressed while you have a pending action of your own (draw,
+  // choose, power targeting, or give-a-card). Other players may still flip.
+  // This also covers "cannot flip on your own discard during your own turn."
+  if (actorHasPendingAction(state, action.playerId)) {
     return reject(
       state,
       action.playerId,
       'FLIP_ATTEMPT',
-      'Cannot flip on your own discard during your own turn',
+      'Flips are suppressed while you have a pending action',
     );
   }
 

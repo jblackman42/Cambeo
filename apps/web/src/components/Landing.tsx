@@ -1,5 +1,6 @@
 'use client';
 
+import { MuteToggle } from '@/components/MuteToggle';
 import { getRememberedPlayerId, getUsername, setUsername, workerHttpUrl } from '@/lib/session';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -61,9 +62,12 @@ export function Landing() {
 
   return (
     <div className="app-shell">
-      <header>
-        <h1 className="brand">Cambeo</h1>
-        <p className="brand-sub">Fewest points wins. Create a room or join by code.</p>
+      <header className="chrome-row">
+        <div>
+          <h1 className="brand">Cambeo</h1>
+          <p className="brand-sub">Fewest points wins. Create a room or join by code.</p>
+        </div>
+        <MuteToggle />
       </header>
 
       <div className="panel">

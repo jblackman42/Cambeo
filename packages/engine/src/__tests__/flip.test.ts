@@ -271,6 +271,66 @@ describe('flip', () => {
     expect(rejected(next)).toBe(true);
   });
 
+  it('actor cannot flip during their own TURN_DRAW', () => {
+    const state = startStacked({
+      hands: {
+        p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: '7' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: '5' }],
+      discard: [{ key: '7' }],
+    });
+    expect(state.phase).toBe('TURN_DRAW');
+    expect(state.turn?.playerId).toBe(P1);
+    const next = apply(state, {
+      type: 'FLIP_ATTEMPT',
+      playerId: P1,
+      target: { playerId: P2, slotIndex: 0 },
+    });
+    expect(rejected(next)).toBe(true);
+    const reason = next.lastEvents.find((e) => e.type === 'ACTION_REJECTED');
+    expect(reason && reason.type === 'ACTION_REJECTED' && reason.reason).toMatch(/pending action/);
+  });
+
+  it('other players can still flip during the actor TURN_DRAW', () => {
+    const state = startStacked({
+      hands: {
+        p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: '7' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: '5' }],
+      discard: [{ key: '7' }],
+    });
+    const next = apply(state, {
+      type: 'FLIP_ATTEMPT',
+      playerId: P2,
+      target: { playerId: P2, slotIndex: 0 },
+    });
+    expect(hasEvent(next, 'FLIP_SUCCESS')).toBe(true);
+  });
+
+  it('actor cannot flip during TURN_CHOICE', () => {
+    let state = startStacked({
+      hands: {
+        p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: '7' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: '5' }],
+      discard: [{ key: '7' }],
+    });
+    state = apply(state, { type: 'DRAW_DECK', playerId: P1 });
+    expect(state.phase).toBe('TURN_CHOICE');
+    const next = apply(state, {
+      type: 'FLIP_ATTEMPT',
+      playerId: P1,
+      target: { playerId: P2, slotIndex: 0 },
+    });
+    expect(rejected(next)).toBe(true);
+  });
+
   it('flips rejected in SCORING and OVER', () => {
     let state = startStacked({
       hands: {

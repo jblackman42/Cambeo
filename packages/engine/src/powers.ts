@@ -1,7 +1,13 @@
-import { POWER_DEFINITIONS, type RuleSet } from '@cambeo/shared';
+import {
+  POWER_DEFINITIONS,
+  cardTargetsForEffect,
+  powerStepLacksLegalTarget,
+  type PowerStep,
+  type RuleSet,
+} from '@cambeo/shared';
 import type { Action } from './actions.js';
 import type { GameEvent } from './events.js';
-import type { GameState, PowerTarget } from './state.js';
+import type { GameState, PendingPower, PowerTarget } from './state.js';
 import type { Rng } from './rng.js';
 import { grantKnowledge, clearKnowledgeForCards } from './knowledge.js';
 import { getCard, isCambeoCallerProtected, reject, withRng } from './setup.js';
@@ -29,6 +35,119 @@ function validateCardTarget(
     return 'Must target another player card';
   }
   return null;
+}
+
+function stepLacksLegalTarget(state: GameState, pending: PendingPower, stepIndex: number): boolean {
+  return powerStepLacksLegalTarget({
+    powerId: pending.powerId,
+    stepIndex,
+    selections: pending.selections,
+    actorId: pending.playerId,
+    cambeoCallerId: state.cambeo?.callerId ?? null,
+    seating: state.seating,
+    cardCount: (id) => state.players[id]?.hand.length ?? 0,
+  });
+}
+
+function sameCard(
+  a: { playerId: string; slotIndex: number },
+  b: { playerId: string; slotIndex: number },
+): boolean {
+  return a.playerId === b.playerId && a.slotIndex === b.slotIndex;
+}
+
+/**
+ * Skip the current step and any following steps that also have no legal target.
+ * A skipped look proceeds to swap; a skipped swap completes the power without swapping.
+ */
+function skipImpossibleSteps(
+  state: GameState,
+  events: GameEvent[],
+  ruleSet: RuleSet,
+  rng: Rng,
+): GameState {
+  const next = state;
+  const pending = next.pendingPower;
+  if (!pending) return completePower(next, events, ruleSet, rng);
+
+  const definition = POWER_DEFINITIONS[pending.powerId];
+  let stepIndex = pending.stepIndex;
+  const selections = [...pending.selections];
+  const revealedForOptionalSwap = pending.revealedForOptionalSwap
+    ? [...pending.revealedForOptionalSwap]
+    : [];
+
+  while (stepIndex < definition.steps.length) {
+    const hypothetical: PendingPower = {
+      ...pending,
+      stepIndex,
+      selections,
+      revealedForOptionalSwap,
+    };
+    if (!stepLacksLegalTarget(next, hypothetical, stepIndex)) {
+      return withRng(
+        {
+          ...next,
+          pendingPower: hypothetical,
+        },
+        rng,
+        events,
+      );
+    }
+
+    const step = definition.steps[stepIndex]!;
+    events.push({
+      type: 'POWER_STEP_SKIPPED',
+      playerId: pending.playerId,
+      powerId: pending.powerId,
+      stepIndex,
+      reason: 'No legal target',
+    });
+
+    if (shouldAbortPowerOnSkip(definition.steps, stepIndex, step)) {
+      return completePower(
+        {
+          ...next,
+          pendingPower: { ...hypothetical, stepIndex, selections, revealedForOptionalSwap },
+        },
+        events,
+        ruleSet,
+        rng,
+      );
+    }
+
+    selections.push({ kind: 'SKIP' });
+    stepIndex += 1;
+  }
+
+  return completePower(
+    {
+      ...next,
+      pendingPower: {
+        ...pending,
+        stepIndex,
+        selections,
+        revealedForOptionalSwap,
+      },
+    },
+    events,
+    ruleSet,
+    rng,
+  );
+}
+
+function shouldAbortPowerOnSkip(
+  steps: readonly PowerStep[],
+  stepIndex: number,
+  step: PowerStep,
+): boolean {
+  if (step.effect === 'SELECT_FOR_SWAP' || step.effect === 'SHUFFLE' || step.effect === 'CONFIRM_SWAP') {
+    return true;
+  }
+  if (step.effect === 'REVEAL') {
+    return steps.slice(stepIndex + 1).some((s) => s.effect === 'CONFIRM_SWAP');
+  }
+  return false;
 }
 
 export function resolvePowerTarget(
@@ -63,13 +182,16 @@ export function resolvePowerTarget(
     ? [...pending.revealedForOptionalSwap]
     : [];
 
-  // Handle SKIP for optional steps
   if (action.target.kind === 'SKIP') {
-    if (!step.optional) {
+    const canSkip = step.optional === true || stepLacksLegalTarget(state, pending, pending.stepIndex);
+    if (!canSkip) {
       return reject(state, action.playerId, 'RESOLVE_POWER_TARGET', 'Step is not optional');
     }
-    events.push({ type: 'POWER_DECLINED_SWAP', playerId: action.playerId });
-    return completePower(next, events, ruleSet, rng);
+    if (step.optional) {
+      events.push({ type: 'POWER_DECLINED_SWAP', playerId: action.playerId });
+      return completePower(next, events, ruleSet, rng);
+    }
+    return skipImpossibleSteps(next, events, ruleSet, rng);
   }
 
   if (step.kind === 'CONFIRM' || step.effect === 'CONFIRM_SWAP') {
@@ -133,28 +255,24 @@ export function resolvePowerTarget(
     return reject(state, action.playerId, 'RESOLVE_POWER_TARGET', 'Expected card target');
   }
 
+  const cardTarget = action.target;
   const stepKind = step.kind as 'OWN_CARD' | 'OTHER_CARD' | 'ANY_CARD';
-  const err = validateCardTarget(state, action.playerId, action.target, stepKind);
+  const err = validateCardTarget(state, action.playerId, cardTarget, stepKind);
   if (err) {
     return reject(state, action.playerId, 'RESOLVE_POWER_TARGET', err);
   }
 
-  // Prevent selecting the same card twice in a swap
+  // Only swap picks collide with each other. A LOOK_THEN_BLIND_SWAP peek is
+  // not a swap selection — that card may be one of the two swapped afterwards.
   if (step.effect === 'SELECT_FOR_SWAP') {
-    const priorSwap = selections.filter((s) => s.kind === 'CARD');
-    for (const s of priorSwap) {
-      if (
-        s.kind === 'CARD' &&
-        s.playerId === action.target.playerId &&
-        s.slotIndex === action.target.slotIndex
-      ) {
-        return reject(state, action.playerId, 'RESOLVE_POWER_TARGET', 'Cannot select same card twice');
-      }
+    const priorSwap = cardTargetsForEffect(pending.powerId, selections, 'SELECT_FOR_SWAP');
+    if (priorSwap.some((s) => sameCard(s, cardTarget))) {
+      return reject(state, action.playerId, 'RESOLVE_POWER_TARGET', 'Cannot select same card twice');
     }
   }
 
-  selections.push(action.target);
-  const cardId = next.players[action.target.playerId]!.hand[action.target.slotIndex]!;
+  selections.push(cardTarget);
+  const cardId = next.players[cardTarget.playerId]!.hand[cardTarget.slotIndex]!;
   const card = getCard(next, cardId);
 
   if (step.effect === 'REVEAL') {
@@ -162,35 +280,31 @@ export function resolvePowerTarget(
     events.push({
       type: 'POWER_REVEAL',
       playerId: action.playerId,
-      targetPlayerId: action.target.playerId,
-      slotIndex: action.target.slotIndex,
+      targetPlayerId: cardTarget.playerId,
+      slotIndex: cardTarget.slotIndex,
       cardId,
       key: card.key,
       suit: card.suit,
     });
     if (pending.powerId === 'LOOK_THEN_OPTIONAL_SWAP') {
       revealedForOptionalSwap.push({
-        playerId: action.target.playerId,
-        slotIndex: action.target.slotIndex,
+        playerId: cardTarget.playerId,
+        slotIndex: cardTarget.slotIndex,
       });
     }
   }
 
   const nextStepIndex = pending.stepIndex + 1;
 
-  // If we just finished selecting the second swap target, execute the swap
   if (step.effect === 'SELECT_FOR_SWAP') {
-    const swapSelections = selections.filter((s) => s.kind === 'CARD') as Array<
-      Extract<PowerTarget, { kind: 'CARD' }>
-    >;
-    // Count only SELECT_FOR_SWAP steps completed — look at how many swap steps exist up to now
+    const swapSelections = cardTargetsForEffect(pending.powerId, selections, 'SELECT_FOR_SWAP');
     const swapStepsSoFar = definition.steps
       .slice(0, nextStepIndex)
       .filter((s) => s.effect === 'SELECT_FOR_SWAP').length;
 
-    if (swapStepsSoFar === 2 && swapSelections.length >= 2) {
-      const a = swapSelections[swapSelections.length - 2]!;
-      const b = swapSelections[swapSelections.length - 1]!;
+    if (swapStepsSoFar === 2 && swapSelections.length === 2) {
+      const a = swapSelections[0]!;
+      const b = swapSelections[1]!;
       const cardABefore = next.players[a.playerId]!.hand[a.slotIndex]!;
       const cardBBefore = next.players[b.playerId]!.hand[b.slotIndex]!;
       next = swapSlots(next, a, b);

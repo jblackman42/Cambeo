@@ -72,16 +72,16 @@ describe('PASS_TURN', () => {
     state = startStacked({
       hands: {
         p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
-        p2: [{ key: '10' }, { key: '2' }, { key: '3' }, { key: '4' }],
-        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: '5' }, { key: '6' }, { key: '7' }, { key: '8' }],
+        p3: [{ key: '10' }, { key: '2' }, { key: '3' }, { key: '4' }],
       },
       deck: [{ key: '5' }],
       discard: [{ key: '10' }],
     });
     state = apply(state, {
       type: 'FLIP_ATTEMPT',
-      playerId: P1,
-      target: { playerId: P2, slotIndex: 0 },
+      playerId: P2,
+      target: { playerId: P3, slotIndex: 0 },
     });
     expect(state.phase).toBe('GIVE_CARD_PENDING');
     expect(rejected(apply(state, { type: 'PASS_TURN', playerId: P1 }))).toBe(true);

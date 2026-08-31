@@ -1,6 +1,7 @@
 import type { CardKey, Suit } from './cards.js';
 import type { GameEvent } from './events.js';
 import type { PowerId } from './powers.js';
+import type { PowerTarget } from './action.js';
 import type { RuleSet } from './ruleset.js';
 
 /** Wire / client-facing redacted view shapes. Engine projects GameState into these. */
@@ -40,6 +41,8 @@ export interface PendingPowerView {
   playerId: PlayerId;
   powerId: PowerId;
   stepIndex: number;
+  /** Step-aligned targets already chosen (card slots are public; identities are not). */
+  selections: PowerTarget[];
 }
 
 export interface PendingGiveView {

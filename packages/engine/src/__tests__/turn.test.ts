@@ -99,6 +99,85 @@ describe('turn', () => {
     expect(rejected(next)).toBe(true);
   });
 
+  it('keep adds the drawn card without touching discard or firing a power', () => {
+    let state = startStacked({
+      hands: {
+        p1: [{ key: 'Q_RED' }, { key: 'K_RED' }, { key: 'Q_RED' }, { key: 'K_RED' }],
+        p2: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: 'K_RED' }],
+      discard: [{ key: 'K_BLACK' }],
+    });
+    const discardBefore = [...state.discard];
+    const handBefore = state.players[P1]!.hand.length;
+    state = apply(state, { type: 'DRAW_DECK', playerId: P1 });
+    const keptId = state.drawnCard!;
+    state = apply(state, { type: 'KEEP_DRAWN', playerId: P1 });
+    expect(rejected(state)).toBe(false);
+    expect(state.drawnCard).toBeNull();
+    expect(state.discard).toEqual(discardBefore);
+    expect(state.players[P1]!.hand).toHaveLength(handBefore + 1);
+    expect(state.players[P1]!.hand).toContain(keptId);
+    expect(state.pendingPower).toBeNull();
+    expect(hasEvent(state, 'CARD_KEPT')).toBe(true);
+    expect(knows(state, P1, keptId)).toBe(true);
+    expect(state.turn?.playerId).toBe(P2);
+  });
+
+  it('keep of a power card does not start POWER_TARGETING', () => {
+    let state = startStacked({
+      hands: {
+        p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: '6' }],
+      discard: [{ key: 'K_BLACK' }],
+    });
+    state = apply(state, { type: 'DRAW_DECK', playerId: P1 });
+    state = apply(state, { type: 'KEEP_DRAWN', playerId: P1 });
+    expect(state.phase).toBe('TURN_DRAW');
+    expect(state.pendingPower).toBeNull();
+    expect(hasEvent(state, 'POWER_STARTED')).toBe(false);
+  });
+
+  it('keep works with an empty hand (late-game draw for a negative)', () => {
+    let state = startStacked({
+      hands: {
+        p1: [],
+        p2: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: 'Q_RED' }],
+      discard: [{ key: 'K_BLACK' }],
+    });
+    state = apply(state, { type: 'DRAW_DECK', playerId: P1 });
+    const keptId = state.drawnCard!;
+    state = apply(state, { type: 'KEEP_DRAWN', playerId: P1 });
+    expect(rejected(state)).toBe(false);
+    expect(state.players[P1]!.hand).toEqual([keptId]);
+  });
+
+  it('keep from the discard pile is legal and does not fire a power', () => {
+    let state = startStacked({
+      hands: {
+        p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: '5' }],
+      discard: [{ key: '6' }],
+    });
+    const top = state.discard[state.discard.length - 1]!;
+    state = apply(state, { type: 'DRAW_DISCARD', playerId: P1 });
+    state = apply(state, { type: 'KEEP_DRAWN', playerId: P1 });
+    expect(rejected(state)).toBe(false);
+    expect(state.players[P1]!.hand).toContain(top);
+    expect(state.pendingPower).toBeNull();
+    expect(state.discard).not.toContain(top);
+  });
+
   it('acting before drawing is rejected', () => {
     const state = startStacked({
       hands: {
@@ -113,6 +192,8 @@ describe('turn', () => {
     expect(rejected(next)).toBe(true);
     const next2 = apply(state, { type: 'REPLACE_CARD', playerId: P1, slotIndex: 0 });
     expect(rejected(next2)).toBe(true);
+    const next3 = apply(state, { type: 'KEEP_DRAWN', playerId: P1 });
+    expect(rejected(next3)).toBe(true);
   });
 
   it('discard of NONE power advances turn without POWER_TARGETING', () => {

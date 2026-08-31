@@ -2,6 +2,7 @@
 
 import { CardArtPreloader } from '@/components/CardArtPreloader';
 import { Lobby } from '@/components/Lobby';
+import { MuteToggle } from '@/components/MuteToggle';
 import { Table } from '@/components/Table';
 import { GameProvider, useGame } from '@/lib/game-store';
 import { decodeRuleSetCode } from '@cambeo/shared';
@@ -13,9 +14,12 @@ function Shell() {
   return (
     <div className="app-shell">
       <CardArtPreloader />
-      <header>
-        <h1 className="brand">Cambeo</h1>
-        <p className="brand-sub">{view ? 'Hot-seat table' : 'Fewest points wins'}</p>
+      <header className="chrome-row">
+        <div>
+          <h1 className="brand">Cambeo</h1>
+          <p className="brand-sub">{view ? 'Hot-seat table' : 'Fewest points wins'}</p>
+        </div>
+        <MuteToggle />
       </header>
       {!view ? <Lobby /> : <Table />}
     </div>

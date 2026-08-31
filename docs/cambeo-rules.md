@@ -72,8 +72,9 @@ On your turn:
 2. Then choose one:
    - **Discard it to use its power.** The card goes to the discard pile and its power resolves immediately.
    - **Replace one of your own cards with it.** Your old card goes face up on the discard pile. Nothing triggers.
+   - **Keep it.** The card is added to your hand. Nothing goes on the discard pile, and no power fires. Typical late-game use: you draw a negative while already holding only negatives, and you do not want to give one up.
 
-**A card drawn from the discard pile can never be used for its power.** It can only be swapped into your hand.
+**A card drawn from the discard pile can never be used for its power.** It can be replaced into your hand or kept. It cannot be discarded for a power.
 
 If the deck runs out, the discard pile is shuffled and becomes the new deck.
 
@@ -98,7 +99,7 @@ You do not need to remember which cards have powers. The game prompts you when a
 
 Flipping is the fast, chaotic part of the game, and it runs continuously, not just on your turn.
 
-**At any point you can tap any card on the table — your own or another player's — to flip it face up.**
+**At any point you can attempt to flip any card on the table — your own or another player's — except while you have a pending action of your own.**
 
 A flip is correct if the flipped card **matches the rank** of the top card on the discard pile. **Rank only, color and suit are ignored.** A black Queen flips successfully onto a red Queen even though they are worth different points.
 
@@ -110,6 +111,7 @@ Constraints:
 
 - **Only one successful flip per discard.** First one to land it wins; everyone else is too late.
 - **You cannot flip on your own discard during your own turn.**
+- **Flips are suppressed while you have a pending action of your own** — drawing, choosing what to do with a drawn card, resolving a power, or giving a card after a flip. Other players may still flip during that window. An opponent landing a successful flip that would otherwise make one of your cards match does not reopen flipping for you; you finish the pending action first.
 - **If you ever have more than 6 cards, you lose.**
 
 ---
@@ -146,6 +148,7 @@ The game is over at that point. Start a new one to play again.
 - Heaven can be discarded until cambeo is called, then never again.
 - Hell can only ever be discarded by flipping it onto heaven.
 - Black face cards and 10s are 10 points each.
+- After drawing you may discard (for power), replace a card, or keep the draw as an extra card.
 - Powers only fire on cards drawn from the deck, never from the discard pile.
 - Flips match on rank only.
 - Flip fast, but a bad flip costs you a card, and more than 6 cards means you lose.

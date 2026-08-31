@@ -1,63 +1,121 @@
 'use client';
 
 import { POWER_DEFINITIONS } from '@cambeo/shared';
-import { useEffect } from 'react';
 import { useGame } from '@/lib/play-context';
-import { powerPromptLabel } from '@/lib/format';
+import { powerActionCopy, isRaceLossReason, powerStepNeedsSkip } from '@/lib/input-routing';
+import { useTableInput } from '@/lib/table-input';
+import { flipConfirmMessage, rankSpokenName } from '@/lib/format';
+import { useEffect, useRef } from 'react';
 
 export function PromptBar() {
+  const { view, viewerId, names, lastReject, dispatch, playMode } = useGame();
   const {
-    view,
-    viewerId,
-    names,
-    lastReject,
-    mode,
-    setMode,
-    dispatch,
-    playMode,
-  } = useGame();
+    localPhase,
+    armed,
+    confirm,
+    penalty,
+    skipWrongFlipConfirm,
+    setSkipWrongFlipConfirm,
+    disarm,
+    confirmWrongFlip,
+    dismissPenalty,
+  } = useTableInput();
 
   const pending = view?.pendingPower;
   const powerDef = pending ? POWER_DEFINITIONS[pending.powerId] : null;
   const step = powerDef && pending ? powerDef.steps[pending.stepIndex] : null;
+  const penaltyUntil = useRef(0);
 
   useEffect(() => {
-    if (!view || !pending || pending.playerId !== viewerId || !step) {
-      return;
-    }
-    if (step.kind === 'CONFIRM') return;
-    if (step.kind === 'ANY_PLAYER') {
-      setMode({ kind: 'power-player' });
-      return;
-    }
-    setMode({
-      kind: 'power-card',
-      allowOwn: step.kind === 'OWN_CARD' || step.kind === 'ANY_CARD',
-      allowOther: step.kind === 'OTHER_CARD' || step.kind === 'ANY_CARD',
-    });
-  }, [view, pending, viewerId, step, setMode]);
+    if (!penalty) return;
+    penaltyUntil.current = Date.now() + 2500;
+    const t = window.setTimeout(() => dismissPenalty(), 2500);
+    return () => window.clearTimeout(t);
+  }, [penalty, dismissPenalty]);
 
   if (!view) return null;
 
   const isViewerTurn = view.turn?.playerId === viewerId;
   const name = (id: string) => names[id] ?? id;
-  const seatHint =
-    playMode === 'hotseat' ? ' Switch seat to play as them.' : '';
+  const seatHint = playMode === 'hotseat' ? ' Switch seat to play as them.' : '';
+  const reject =
+    lastReject && !isRaceLossReason(lastReject) ? lastReject : null;
+
+  const extras = (
+    <>
+      {reject && <div className="reject-toast">{reject}</div>}
+      {penalty && (
+        <button type="button" className="penalty-notice" onClick={dismissPenalty}>
+          <span className="icon" aria-hidden>
+            ✕
+          </span>
+          {penalty}
+        </button>
+      )}
+      {confirm && (
+        <div className="flip-confirm">
+          <p className="prompt-title">This flip will miss</p>
+          <p className="prompt-hint">{flipConfirmMessage(confirm.knownKey, confirm.discardKey)}</p>
+          <label className="field-check">
+            <input
+              type="checkbox"
+              checked={skipWrongFlipConfirm}
+              onChange={(e) => setSkipWrongFlipConfirm(e.target.checked)}
+            />
+            Don&apos;t ask again this game
+          </label>
+          <div className="btn-row">
+            <button type="button" className="btn btn-ghost" onClick={disarm}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn-danger" onClick={confirmWrongFlip}>
+              Flip anyway
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 
   if (view.phase === 'OVER' && view.result) {
     return null;
+  }
+
+  if (confirm) {
+    return <div className="prompt-bar">{extras}</div>;
+  }
+
+  if (armed) {
+    return (
+      <div className="prompt-bar">
+        {extras}
+        <div className="action-bar-head">
+          <div>
+            <p className="prompt-kicker">Flip</p>
+            <p className="prompt-title">Tap again to flip</p>
+            <p className="prompt-hint">
+              Discard shows {rankSpokenName(armed.discardKey)}.
+            </p>
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={disarm}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (view.phase === 'INITIAL_PEEK') {
     const acked = view.ackedPeek.includes(viewerId);
     return (
       <div className="prompt-bar">
-        {lastReject && <div className="reject-toast">{lastReject}</div>}
+        {extras}
+        <p className="prompt-kicker">Peek</p>
         <p className="prompt-title">Memorize your peeks</p>
         <p className="prompt-hint">
           {acked
             ? 'Waiting for everyone else…'
-            : `You can see ${view.ruleSet.initialRevealCount} of your cards.`}
+            : `You can see ${view.ruleSet.initialRevealCount} of your cards. They stay in place.`}
         </p>
         <div className="btn-row">
           <button
@@ -76,7 +134,7 @@ export function PromptBar() {
   if (view.phase === 'LOBBY') {
     return (
       <div className="prompt-bar">
-        {lastReject && <div className="reject-toast">{lastReject}</div>}
+        {extras}
         <p className="prompt-title">Deal when ready</p>
       </div>
     );
@@ -86,14 +144,15 @@ export function PromptBar() {
     const isFlipper = view.pendingGive.flipperId === viewerId;
     return (
       <div className="prompt-bar">
-        {lastReject && <div className="reject-toast">{lastReject}</div>}
+        {extras}
+        <p className="prompt-kicker">Give a card</p>
         <p className="prompt-title">
           {isFlipper
             ? `Give a card to ${name(view.pendingGive.targetId)}`
             : `${name(view.pendingGive.flipperId)} is choosing a card to give`}
         </p>
         <p className="prompt-hint">
-          {isFlipper ? 'Tap one of your cards.' : `Flips are paused.${seatHint}`}
+          {isFlipper ? 'Tap one of your cards.' : `Waiting.${seatHint}`}
         </p>
       </div>
     );
@@ -104,18 +163,35 @@ export function PromptBar() {
     if (!isActor) {
       return (
         <div className="prompt-bar">
-          {lastReject && <div className="reject-toast">{lastReject}</div>}
-          <p className="prompt-title">{name(pending.playerId)} is resolving {pending.powerId}</p>
-          <p className="prompt-hint">Flips are still legal.{seatHint}</p>
+          {extras}
+          <p className="prompt-title">
+            {name(pending.playerId)} is resolving {powerActionCopy(pending.powerId, pending.stepIndex).kicker}
+          </p>
+          <p className="prompt-hint">You can still arm a flip.{seatHint}</p>
         </div>
       );
     }
 
+    const copy = powerActionCopy(pending.powerId, pending.stepIndex);
+    const needsSkip = powerStepNeedsSkip(view, viewerId);
+    const skipHint =
+      needsSkip && step?.kind === 'OTHER_CARD'
+        ? 'No opponent card you can look at. Skip to continue.'
+        : needsSkip && step?.effect === 'SELECT_FOR_SWAP'
+          ? 'Not enough cards left to swap. Skip to continue.'
+          : needsSkip
+            ? 'No legal target. Skip this step to continue.'
+            : null;
+
     if (step?.kind === 'CONFIRM') {
       return (
         <div className="prompt-bar">
-          {lastReject && <div className="reject-toast">{lastReject}</div>}
-          <p className="prompt-title">{powerPromptLabel(pending.powerId, 'CONFIRM')}</p>
+          {extras}
+          <p className="prompt-kicker">
+            {copy.kicker}
+            {copy.stepLabel ? ` · ${copy.stepLabel}` : ''}
+          </p>
+          <p className="prompt-title">{copy.instruction}</p>
           <div className="btn-row">
             <button
               type="button"
@@ -151,10 +227,10 @@ export function PromptBar() {
     if (step?.kind === 'ANY_PLAYER') {
       return (
         <div className="prompt-bar">
-          {lastReject && <div className="reject-toast">{lastReject}</div>}
-          <p className="prompt-title">
-            {powerPromptLabel(pending.powerId, step.kind)}
-          </p>
+          {extras}
+          <p className="prompt-kicker">{copy.kicker}</p>
+          <p className="prompt-title">{copy.instruction}</p>
+          {skipHint && <p className="prompt-hint">{skipHint}</p>}
           <div className="btn-row">
             {view.seating
               .filter((id) => id !== view.cambeoCallerId)
@@ -174,6 +250,21 @@ export function PromptBar() {
                   {name(id)}
                 </button>
               ))}
+            {needsSkip && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() =>
+                  dispatch({
+                    type: 'RESOLVE_POWER_TARGET',
+                    playerId: viewerId,
+                    target: { kind: 'SKIP' },
+                  })
+                }
+              >
+                Skip
+              </button>
+            )}
           </div>
         </div>
       );
@@ -181,11 +272,32 @@ export function PromptBar() {
 
     return (
       <div className="prompt-bar">
-        {lastReject && <div className="reject-toast">{lastReject}</div>}
-        <p className="prompt-title">
-          {step ? powerPromptLabel(pending.powerId, step.kind) : pending.powerId}
-        </p>
-        <p className="prompt-hint">Tap a highlighted card. Flips still work for others.</p>
+        {extras}
+        <div className="action-bar-head">
+          <div>
+            <p className="prompt-kicker">
+              {copy.kicker}
+              {copy.stepLabel ? ` · ${copy.stepLabel}` : ''}
+            </p>
+            <p className="prompt-title">{copy.instruction}</p>
+            {skipHint && <p className="prompt-hint">{skipHint}</p>}
+          </div>
+          {(copy.canCancel || needsSkip) && (
+            <button
+              type="button"
+              className={needsSkip ? 'btn btn-primary' : 'btn btn-ghost'}
+              onClick={() =>
+                dispatch({
+                  type: 'RESOLVE_POWER_TARGET',
+                  playerId: viewerId,
+                  target: { kind: 'SKIP' },
+                })
+              }
+            >
+              {needsSkip ? 'Skip' : 'Cancel'}
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -197,8 +309,9 @@ export function PromptBar() {
   ) {
     return (
       <div className="prompt-bar">
-        {lastReject && <div className="reject-toast">{lastReject}</div>}
-        <p className="prompt-title">Your turn — draw</p>
+        {extras}
+        <p className="prompt-kicker">Your turn</p>
+        <p className="prompt-title">Draw</p>
         <p className="prompt-hint">
           {view.phase === 'FINAL_ROUND' ? 'Final round after Cambeo.' : 'Or call Cambeo before drawing.'}
         </p>
@@ -234,34 +347,35 @@ export function PromptBar() {
 
   if (view.phase === 'TURN_CHOICE' && isViewerTurn && view.drawnCard) {
     const drawnKey = view.drawnCard.key;
-    const hellLocked =
-      drawnKey === 'HELL' && view.ruleSet.hellDiscardOnlyOntoHeaven;
+    const canReplace = (view.players[viewerId]?.cardCount ?? 0) > 0;
+    const hellLocked = drawnKey === 'HELL' && view.ruleSet.hellDiscardOnlyOntoHeaven;
     const heavenLocked =
       drawnKey === 'HEAVEN' &&
       !view.ruleSet.heavenDiscardableAfterCambeo &&
       view.cambeoCallerId !== null;
 
+    const keep = (label: string, primary = false) => (
+      <button
+        type="button"
+        className={primary ? 'btn btn-primary' : 'btn btn-ghost'}
+        onClick={() => dispatch({ type: 'KEEP_DRAWN', playerId: viewerId })}
+      >
+        {label}
+      </button>
+    );
+
     if (hellLocked) {
       return (
         <div className="prompt-bar">
-          {lastReject && <div className="reject-toast">{lastReject}</div>}
-          <p className="prompt-title">Hell — replace only</p>
+          {extras}
+          <p className="prompt-kicker">Hell</p>
+          <p className="prompt-title">{canReplace ? 'Replace only' : 'Keep it'}</p>
           <p className="prompt-hint">
-            Hell cannot be discarded except by flipping it onto heaven. Replace one of
-            your cards with it.
+            {canReplace
+              ? 'Hell cannot be discarded except by flipping it onto heaven. Tap one of your cards to replace it.'
+              : 'Hell cannot be discarded except by flipping it onto heaven. You have no cards to replace, so keep it to end your turn.'}
           </p>
-          <div className="btn-row">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setMode({ kind: 'replace' })}
-            >
-              Replace a card…
-            </button>
-          </div>
-          {mode.kind === 'replace' && (
-            <p className="prompt-hint">Tap one of your cards to replace it.</p>
-          )}
+          <div className="btn-row">{canReplace ? null : keep('Keep', true)}</div>
         </div>
       );
     }
@@ -269,46 +383,30 @@ export function PromptBar() {
     if (heavenLocked) {
       return (
         <div className="prompt-bar">
-          {lastReject && <div className="reject-toast">{lastReject}</div>}
-          <p className="prompt-title">Heaven — keep it</p>
+          {extras}
+          <p className="prompt-kicker">Heaven</p>
+          <p className="prompt-title">Keep it</p>
           <p className="prompt-hint">
-            After Cambeo, heaven cannot go on the discard pile. Keep it in your hand to
-            end your turn. You may still replace a non-heaven card if you want something
-            else on the pile.
+            After Cambeo, heaven cannot go on the discard pile. Keep it in your hand to end your
+            turn.
+            {canReplace
+              ? ' You may still tap a non-heaven card to replace it if you want something else on the pile.'
+              : ''}
           </p>
-          <div className="btn-row">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => dispatch({ type: 'KEEP_DRAWN', playerId: viewerId })}
-            >
-              Keep heaven
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setMode({ kind: 'replace' })}
-            >
-              Replace a non-heaven card…
-            </button>
-          </div>
-          {mode.kind === 'replace' && (
-            <p className="prompt-hint">
-              Tap a card that is not heaven — replacing heaven onto the pile is illegal.
-            </p>
-          )}
+          <div className="btn-row">{keep('Keep heaven', true)}</div>
         </div>
       );
     }
 
     return (
       <div className="prompt-bar">
-        {lastReject && <div className="reject-toast">{lastReject}</div>}
-        <p className="prompt-title">Keep or discard?</p>
+        {extras}
+        <p className="prompt-kicker">Your turn</p>
+        <p className="prompt-title">Discard, replace, or keep?</p>
         <p className="prompt-hint">
           {view.turn?.drawnFrom === 'DISCARD'
-            ? 'Drawn from discard — power will not fire if you discard it.'
-            : 'Discard to use its power, or replace one of your cards.'}
+            ? 'Drawn from discard — discarding it will not fire a power. Tap one of your cards to replace it.'
+            : 'Discard to use its power, tap a card to replace, or keep it as an extra card.'}
         </p>
         <div className="btn-row">
           <button
@@ -318,31 +416,23 @@ export function PromptBar() {
           >
             Discard
           </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            data-active={mode.kind === 'replace'}
-            onClick={() => setMode({ kind: 'replace' })}
-          >
-            Replace a card…
-          </button>
+          {keep('Keep')}
         </div>
-        {mode.kind === 'replace' && (
-          <p className="prompt-hint">Tap one of your cards to replace it.</p>
-        )}
       </div>
     );
   }
 
   return (
     <div className="prompt-bar">
-      {lastReject && <div className="reject-toast">{lastReject}</div>}
-      <p className="prompt-title">
-        {view.turn
-          ? `${name(view.turn.playerId)}'s turn`
-          : view.phase}
+      {extras}
+      <p className="prompt-title">{view.turn ? `${name(view.turn.playerId)}'s turn` : view.phase}</p>
+      <p className="prompt-hint">
+        {localPhase === 'CALLED_CAMBEO'
+          ? 'You called Cambeo. Your cards are locked.'
+          : view.discardTop
+            ? `Tap a card twice to flip. Discard shows ${rankSpokenName(view.discardTop.key)}.`
+            : 'Waiting…'}
       </p>
-      <p className="prompt-hint">Tap any card to attempt a flip.</p>
     </div>
   );
 }

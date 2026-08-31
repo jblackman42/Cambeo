@@ -77,3 +77,105 @@ export const POWER_DEFINITIONS: Record<PowerId, PowerDefinition> = {
 export function isPowerId(value: string): value is PowerId {
   return (POWER_IDS as readonly string[]).includes(value);
 }
+
+/** Card selections already committed for a given step effect, aligned by step index. */
+export function cardTargetsForEffect(
+  powerId: PowerId,
+  selections: ReadonlyArray<{ kind: string; playerId?: string; slotIndex?: number }>,
+  effect: PowerStepEffect,
+): Array<{ playerId: string; slotIndex: number }> {
+  const steps = POWER_DEFINITIONS[powerId].steps;
+  const out: Array<{ playerId: string; slotIndex: number }> = [];
+  for (let i = 0; i < selections.length; i++) {
+    const step = steps[i];
+    const target = selections[i];
+    if (
+      step?.effect === effect &&
+      target?.kind === 'CARD' &&
+      typeof target.playerId === 'string' &&
+      typeof target.slotIndex === 'number'
+    ) {
+      out.push({ playerId: target.playerId, slotIndex: target.slotIndex });
+    }
+  }
+  return out;
+}
+
+export function isLegalPowerCardOwner(
+  stepKind: PowerTargetKind,
+  actorId: string,
+  ownerId: string,
+  cambeoCallerId: string | null,
+): boolean {
+  if (cambeoCallerId === ownerId && ownerId !== actorId) return false;
+  if (stepKind === 'OWN_CARD') return ownerId === actorId;
+  if (stepKind === 'OTHER_CARD') return ownerId !== actorId;
+  if (stepKind === 'ANY_CARD') return true;
+  return false;
+}
+
+export function countLegalPowerCardTargets(args: {
+  stepKind: Extract<PowerTargetKind, 'OWN_CARD' | 'OTHER_CARD' | 'ANY_CARD'>;
+  actorId: string;
+  cambeoCallerId: string | null;
+  seating: readonly string[];
+  cardCount: (playerId: string) => number;
+  exclude?: ReadonlyArray<{ playerId: string; slotIndex: number }>;
+}): number {
+  const exclude = args.exclude ?? [];
+  let count = 0;
+  for (const playerId of args.seating) {
+    if (!isLegalPowerCardOwner(args.stepKind, args.actorId, playerId, args.cambeoCallerId)) {
+      continue;
+    }
+    const n = args.cardCount(playerId);
+    for (let slotIndex = 0; slotIndex < n; slotIndex++) {
+      if (exclude.some((e) => e.playerId === playerId && e.slotIndex === slotIndex)) continue;
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * True when the current targeting step cannot be fulfilled (empty hands, cambeo
+ * lock, or fewer than two swappable cards). The actor may SKIP in that case.
+ */
+export function powerStepLacksLegalTarget(args: {
+  powerId: PowerId;
+  stepIndex: number;
+  selections: ReadonlyArray<{ kind: string; playerId?: string; slotIndex?: number }>;
+  actorId: string;
+  cambeoCallerId: string | null;
+  seating: readonly string[];
+  cardCount: (playerId: string) => number;
+}): boolean {
+  const step = POWER_DEFINITIONS[args.powerId].steps[args.stepIndex];
+  if (!step) return false;
+  if (step.kind === 'CONFIRM') return false;
+  if (step.kind === 'ANY_PLAYER') {
+    return args.seating.every((id) => id === args.cambeoCallerId);
+  }
+  if (step.kind !== 'OWN_CARD' && step.kind !== 'OTHER_CARD' && step.kind !== 'ANY_CARD') {
+    return false;
+  }
+  const exclude =
+    step.effect === 'SELECT_FOR_SWAP'
+      ? cardTargetsForEffect(args.powerId, args.selections, 'SELECT_FOR_SWAP')
+      : [];
+  const count = countLegalPowerCardTargets({
+    stepKind: step.kind,
+    actorId: args.actorId,
+    cambeoCallerId: args.cambeoCallerId,
+    seating: args.seating,
+    cardCount: args.cardCount,
+    exclude,
+  });
+  if (step.effect === 'SELECT_FOR_SWAP') {
+    const remainingSwapSteps = POWER_DEFINITIONS[args.powerId].steps
+      .slice(args.stepIndex)
+      .filter((s) => s.effect === 'SELECT_FOR_SWAP').length;
+    return count < remainingSwapSteps;
+  }
+  return count < 1;
+}

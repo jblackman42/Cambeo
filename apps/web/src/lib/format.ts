@@ -46,7 +46,7 @@ export function powerLabel(id: PowerId | string): string {
     case 'BLIND_SWAP':
       return 'Blind swap';
     case 'LOOK_THEN_BLIND_SWAP':
-      return 'Look then swap';
+      return 'Look and Swap';
     case 'LOOK_THEN_OPTIONAL_SWAP':
       return 'Look then optional swap';
     case 'SHUFFLE_TARGET_HAND':
@@ -77,6 +77,42 @@ export function rankLabel(key: CardKey): string {
     default:
       return key;
   }
+}
+
+/** Spoken rank for prompts ("Queen", "7", "Heaven"). */
+export function rankSpokenName(key: CardKey): string {
+  switch (key) {
+    case 'A':
+      return 'Ace';
+    case 'J':
+      return 'Jack';
+    case 'Q_RED':
+    case 'Q_BLACK':
+      return 'Queen';
+    case 'K_RED':
+    case 'K_BLACK':
+      return 'King';
+    case 'HEAVEN':
+      return 'Heaven';
+    case 'HELL':
+      return 'Hell';
+    default:
+      return key;
+  }
+}
+
+function withArticle(name: string): string {
+  if (name === 'Heaven' || name === 'Hell') return name;
+  const an = /^(Ace|8|11|18|[AEIOU])/i.test(name);
+  return `${an ? 'an' : 'a'} ${name}`;
+}
+
+export function flipPenaltyMessage(flippedKey: CardKey, discardKey: CardKey): string {
+  return `No match. You flipped ${withArticle(rankSpokenName(flippedKey))} onto ${withArticle(rankSpokenName(discardKey))}. You take a penalty card.`;
+}
+
+export function flipConfirmMessage(knownKey: CardKey, discardKey: CardKey): string {
+  return `You know this is ${withArticle(rankSpokenName(knownKey))}. Discard shows ${withArticle(rankSpokenName(discardKey))}. A wrong flip costs a penalty card.`;
 }
 
 export function powerPromptLabel(powerId: string, stepKind: string): string {

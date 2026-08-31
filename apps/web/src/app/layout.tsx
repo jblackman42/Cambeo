@@ -1,17 +1,12 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import { Bricolage_Grotesque, Figtree } from 'next/font/google';
+import { Roboto } from 'next/font/google';
 import './globals.css';
 
-const display = Bricolage_Grotesque({
+const roboto = Roboto({
   subsets: ['latin'],
-  variable: '--font-display-loaded',
-  display: 'swap',
-});
-
-const body = Figtree({
-  subsets: ['latin'],
-  variable: '--font-body-loaded',
+  weight: ['400', '500', '700'],
+  variable: '--font-ui-loaded',
   display: 'swap',
 });
 
@@ -22,17 +17,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body
-        style={
-          {
-            '--font-display': 'var(--font-display-loaded), system-ui, sans-serif',
-            '--font-body': 'var(--font-body-loaded), system-ui, sans-serif',
-          } as CSSProperties
-        }
-      >
-        {children}
-      </body>
+    <html lang="en" className={`${roboto.className} ${roboto.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

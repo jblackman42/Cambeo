@@ -123,6 +123,7 @@ export function viewFor(
           playerId: state.pendingPower.playerId,
           powerId: state.pendingPower.powerId,
           stepIndex: state.pendingPower.stepIndex,
+          selections: [...state.pendingPower.selections],
         }
       : null,
     pendingGive: state.pendingGive

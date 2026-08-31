@@ -12,6 +12,10 @@ export default tseslint.config(
     '**/*.config.js',
     '**/.next/**',
     '**/next-env.d.ts',
+    '**/packages/server/dist/**',
+    '**/packages/server/scripts/**',
+    '**/.wrangler/**',
+    '**/wrangler.toml',
   ],
   },
   {
@@ -29,6 +33,15 @@ export default tseslint.config(
           message:
             'Math.random is banned in packages/engine and packages/shared. Use the seeded Rng.',
         },
+      ],
+    },
+  },
+  {
+    files: ['packages/server/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
     },
   },

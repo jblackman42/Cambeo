@@ -1,4 +1,5 @@
 import type { CardKey, Suit } from './cards.js';
+import type { GameEvent } from './events.js';
 import type { PowerId } from './powers.js';
 import type { RuleSet } from './ruleset.js';
 
@@ -74,4 +75,6 @@ export interface RedactedGameView {
   overThreshold: PlayerId[];
   result: GameResultView | null;
   ruleSet: RuleSet;
+  ackedPeek: PlayerId[];
+  lastEvents: GameEvent[];
 }

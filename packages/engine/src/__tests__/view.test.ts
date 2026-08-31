@@ -97,4 +97,37 @@ describe('view', () => {
     expect(c.viewerId).toBe(P2);
     expect(c).not.toEqual(a);
   });
+
+  it('includes ackedPeek', () => {
+    const state = startPlaying();
+    const view = viewFor(state, P1, HOUSE_RULES);
+    expect(view.ackedPeek).toEqual([P1, P2, P3]);
+  });
+
+  it('redacts POWER_REVEAL key from a non-peeker’s events', () => {
+    let state = startStacked({
+      hands: {
+        p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: '5' }, { key: '6' }, { key: '7' }, { key: '8' }],
+        p3: [{ key: '9' }, { key: '10' }, { key: 'J' }, { key: 'Q_RED' }],
+      },
+      deck: [{ key: '8' }],
+      discard: [{ key: 'K_BLACK' }],
+    });
+    state = apply(state, { type: 'DRAW_DECK', playerId: P1 });
+    state = apply(state, { type: 'DISCARD_DRAWN', playerId: P1 });
+    state = apply(state, {
+      type: 'RESOLVE_POWER_TARGET',
+      playerId: P1,
+      target: { kind: 'CARD', playerId: P2, slotIndex: 2 },
+    });
+    const v1 = viewFor(state, P1, HOUSE_RULES);
+    const v3 = viewFor(state, P3, HOUSE_RULES);
+    const reveal1 = v1.lastEvents.find((e) => e.type === 'POWER_REVEAL');
+    const reveal3 = v3.lastEvents.find((e) => e.type === 'POWER_REVEAL');
+    expect(reveal1?.type).toBe('POWER_REVEAL');
+    expect(reveal3?.type).toBe('POWER_REVEAL');
+    if (reveal1?.type === 'POWER_REVEAL') expect(reveal1.key).toBe('7');
+    if (reveal3?.type === 'POWER_REVEAL') expect(reveal3.key).toBeUndefined();
+  });
 });

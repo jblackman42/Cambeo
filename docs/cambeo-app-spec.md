@@ -110,7 +110,7 @@ reduce(state: GameState, action: Action, ruleSet: RuleSet, rng: Rng): GameState
 - Owns the full authoritative state including every face-down card identity.
 - Emits an event list per action so the server can fan out redacted views and the client can animate.
 
-**Actions:** `DRAW_DECK`, `DRAW_DISCARD`, `DISCARD_DRAWN`, `REPLACE_CARD`, `KEEP_DRAWN`, `RESOLVE_POWER_TARGET`, `FLIP_ATTEMPT`, `GIVE_CARD`, `CALL_CAMBEO`.
+**Actions:** `DRAW_DECK`, `DRAW_DISCARD`, `DISCARD_DRAWN`, `REPLACE_CARD`, `KEEP_DRAWN`, `RESOLVE_POWER_TARGET`, `FLIP_ATTEMPT`, `GIVE_CARD`, `CALL_CAMBEO`, `PASS_TURN`.
 
 `KEEP_DRAWN` adds the drawn card to the player's hand and ends the turn without putting anything on the discard pile. It exists so a player who draws heaven during the final round (when heaven cannot be discarded or replaced onto the pile) can still finish their turn holding it.
 
@@ -166,7 +166,7 @@ The engine tracks a per-player "knowledge set" of card ids so that a peeked card
 
 **Flip race resolution:** flips arrive as messages, are ordered by server arrival, and the first valid attempt against a given discard wins. All later attempts against that same discard are rejected. Start there. If latency turns out to be unfair, add a 250ms collection window resolved by client timestamp with a clock offset measured at join.
 
-**Reconnect:** a client that drops rejoins by room code and player id, and receives a full redacted state snapshot. A player disconnected for more than a set timeout on their turn is auto-passed rather than stalling the room.
+**Reconnect:** a client that drops rejoins by room code and player id, and receives a full redacted state snapshot. A player disconnected for more than a set timeout on their turn is auto-passed rather than stalling the room. Default timeout is 45s (`TURN_TIMEOUT_MS`). Auto-pass uses `PASS_TURN` (undrawn turn), `KEEP_DRAWN` (already drawn), or `ACK_PEEK` (initial peek). Power targeting and give-card prompts are not auto-resolved.
 
 ---
 

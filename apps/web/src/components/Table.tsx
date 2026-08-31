@@ -1,12 +1,12 @@
 'use client';
 
-import type { PlayerId } from '@cambeo/engine';
+import type { PlayerId } from '@cambeo/shared';
 import { CardFace } from '@/components/CardFace';
 import { EventLog } from '@/components/EventLog';
 import { PromptBar } from '@/components/PromptBar';
 import { Scoring } from '@/components/Scoring';
 import { SeatSwitcher } from '@/components/SeatSwitcher';
-import { useGame, type InteractionMode } from '@/lib/game-store';
+import { useGame, type InteractionMode } from '@/lib/play-context';
 
 function cardSelectable(
   mode: InteractionMode,
@@ -24,21 +24,21 @@ function cardSelectable(
 }
 
 export function Table() {
-  const { state, view, viewerId, names, mode, dispatch } = useGame();
+  const { view, viewerId, names, mode, dispatch, playMode, playersList } = useGame();
 
-  if (!state || !view) return null;
+  if (!view) return null;
 
-  if (state.phase === 'OVER') {
+  if (view.phase === 'OVER') {
     return (
       <>
-        <SeatSwitcher />
+        {playMode === 'hotseat' && <SeatSwitcher />}
         <Scoring />
         <EventLog />
       </>
     );
   }
 
-  const opponents = state.seating.filter((id) => id !== viewerId);
+  const opponents = view.seating.filter((id) => id !== viewerId);
   const you = view.players[viewerId];
 
   const onCardTap = (ownerId: PlayerId, slotIndex: number) => {
@@ -58,7 +58,6 @@ export function Table() {
       });
       return;
     }
-    // Default: flip
     dispatch({
       type: 'FLIP_ATTEMPT',
       playerId: viewerId,
@@ -75,15 +74,18 @@ export function Table() {
           ? 'power'
           : 'flip';
 
+  const connected = (id: PlayerId) =>
+    playersList.find((p) => p.playerId === id)?.connected !== false;
+
   return (
     <div className="table-layout">
-      <SeatSwitcher />
+      {playMode === 'hotseat' && <SeatSwitcher />}
 
       <div className="opponents">
         {opponents.map((id) => {
           const player = view.players[id];
           if (!player) return null;
-          const protectedCaller = state.cambeo?.callerId === id;
+          const protectedCaller = view.cambeoCallerId === id;
           return (
             <div
               key={id}
@@ -94,8 +96,9 @@ export function Table() {
                 <strong>{names[id] ?? id}</strong>
                 <span className="meta-muted">
                   {player.cardCount} cards
-                  {state.turn?.playerId === id ? ' · turn' : ''}
+                  {view.turn?.playerId === id ? ' · turn' : ''}
                   {protectedCaller ? ' · cambeo' : ''}
+                  {playMode === 'online' && !connected(id) ? ' · away' : ''}
                 </span>
               </div>
               <div className="hand-row">
@@ -145,7 +148,7 @@ export function Table() {
         </div>
       </div>
 
-      {view.drawnCard && state.turn?.playerId === viewerId && (
+      {view.drawnCard && view.turn?.playerId === viewerId && (
         <div className="drawn-card-wrap">
           <div>
             <div className="pile-label" style={{ textAlign: 'center', marginBottom: 6 }}>
@@ -159,13 +162,13 @@ export function Table() {
       {you && (
         <div
           className="you-block"
-          data-your-turn={state.turn?.playerId === viewerId}
+          data-your-turn={view.turn?.playerId === viewerId}
         >
           <div className="player-meta">
             <strong>You · {names[viewerId] ?? viewerId}</strong>
             <span className="meta-muted">
               {you.cardCount} cards
-              {state.cambeo?.callerId === viewerId ? ' · cambeo' : ''}
+              {view.cambeoCallerId === viewerId ? ' · cambeo' : ''}
             </span>
           </div>
           <div className="hand-row">

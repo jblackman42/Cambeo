@@ -1,5 +1,5 @@
-import { HotSeatApp } from '@/components/HotSeatApp';
+import { Landing } from '@/components/Landing';
 
 export default function HomePage() {
-  return <HotSeatApp />;
+  return <Landing />;
 }

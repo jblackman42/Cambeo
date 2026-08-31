@@ -2,12 +2,11 @@
 
 import { POWER_DEFINITIONS } from '@cambeo/shared';
 import { useEffect } from 'react';
-import { useGame } from '@/lib/game-store';
+import { useGame } from '@/lib/play-context';
 import { powerPromptLabel } from '@/lib/format';
 
 export function PromptBar() {
   const {
-    state,
     view,
     viewerId,
     names,
@@ -15,14 +14,15 @@ export function PromptBar() {
     mode,
     setMode,
     dispatch,
+    playMode,
   } = useGame();
 
-  const pending = state?.pendingPower;
+  const pending = view?.pendingPower;
   const powerDef = pending ? POWER_DEFINITIONS[pending.powerId] : null;
   const step = powerDef && pending ? powerDef.steps[pending.stepIndex] : null;
 
   useEffect(() => {
-    if (!state || !pending || pending.playerId !== viewerId || !step) {
+    if (!view || !pending || pending.playerId !== viewerId || !step) {
       return;
     }
     if (step.kind === 'CONFIRM') return;
@@ -35,19 +35,21 @@ export function PromptBar() {
       allowOwn: step.kind === 'OWN_CARD' || step.kind === 'ANY_CARD',
       allowOther: step.kind === 'OTHER_CARD' || step.kind === 'ANY_CARD',
     });
-  }, [state, pending, viewerId, step, setMode]);
+  }, [view, pending, viewerId, step, setMode]);
 
-  if (!state || !view) return null;
+  if (!view) return null;
 
-  const isViewerTurn = state.turn?.playerId === viewerId;
+  const isViewerTurn = view.turn?.playerId === viewerId;
   const name = (id: string) => names[id] ?? id;
+  const seatHint =
+    playMode === 'hotseat' ? ' Switch seat to play as them.' : '';
 
-  if (state.phase === 'OVER' && state.result) {
+  if (view.phase === 'OVER' && view.result) {
     return null;
   }
 
-  if (state.phase === 'INITIAL_PEEK') {
-    const acked = state.ackedPeek.includes(viewerId);
+  if (view.phase === 'INITIAL_PEEK') {
+    const acked = view.ackedPeek.includes(viewerId);
     return (
       <div className="prompt-bar">
         {lastReject && <div className="reject-toast">{lastReject}</div>}
@@ -55,7 +57,7 @@ export function PromptBar() {
         <p className="prompt-hint">
           {acked
             ? 'Waiting for everyone else…'
-            : `You can see ${view.ruleSet.initialRevealCount} of your cards. Pass the device when ready.`}
+            : `You can see ${view.ruleSet.initialRevealCount} of your cards.`}
         </p>
         <div className="btn-row">
           <button
@@ -71,49 +73,40 @@ export function PromptBar() {
     );
   }
 
-  if (state.phase === 'LOBBY') {
+  if (view.phase === 'LOBBY') {
     return (
       <div className="prompt-bar">
         {lastReject && <div className="reject-toast">{lastReject}</div>}
         <p className="prompt-title">Deal when ready</p>
-        <div className="btn-row">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => dispatch({ type: 'START_GAME', playerId: viewerId })}
-          >
-            Deal cards
-          </button>
-        </div>
       </div>
     );
   }
 
-  if (state.phase === 'GIVE_CARD_PENDING' && state.pendingGive) {
-    const isFlipper = state.pendingGive.flipperId === viewerId;
+  if (view.phase === 'GIVE_CARD_PENDING' && view.pendingGive) {
+    const isFlipper = view.pendingGive.flipperId === viewerId;
     return (
       <div className="prompt-bar">
         {lastReject && <div className="reject-toast">{lastReject}</div>}
         <p className="prompt-title">
           {isFlipper
-            ? `Give a card to ${name(state.pendingGive.targetId)}`
-            : `${name(state.pendingGive.flipperId)} is choosing a card to give`}
+            ? `Give a card to ${name(view.pendingGive.targetId)}`
+            : `${name(view.pendingGive.flipperId)} is choosing a card to give`}
         </p>
         <p className="prompt-hint">
-          {isFlipper ? 'Tap one of your cards.' : 'Switch seat if you are the flipper.'}
+          {isFlipper ? 'Tap one of your cards.' : `Flips are paused.${seatHint}`}
         </p>
       </div>
     );
   }
 
-  if (state.phase === 'POWER_TARGETING' && pending) {
+  if (view.phase === 'POWER_TARGETING' && pending) {
     const isActor = pending.playerId === viewerId;
     if (!isActor) {
       return (
         <div className="prompt-bar">
           {lastReject && <div className="reject-toast">{lastReject}</div>}
           <p className="prompt-title">{name(pending.playerId)} is resolving {pending.powerId}</p>
-          <p className="prompt-hint">Flips are still legal. Switch seat to act as them.</p>
+          <p className="prompt-hint">Flips are still legal.{seatHint}</p>
         </div>
       );
     }
@@ -163,8 +156,8 @@ export function PromptBar() {
             {powerPromptLabel(pending.powerId, step.kind)}
           </p>
           <div className="btn-row">
-            {state.seating
-              .filter((id) => id !== state.cambeo?.callerId)
+            {view.seating
+              .filter((id) => id !== view.cambeoCallerId)
               .map((id) => (
                 <button
                   key={id}
@@ -198,16 +191,16 @@ export function PromptBar() {
   }
 
   if (
-    (state.phase === 'TURN_DRAW' || state.phase === 'FINAL_ROUND') &&
+    (view.phase === 'TURN_DRAW' || view.phase === 'FINAL_ROUND') &&
     isViewerTurn &&
-    !state.turn?.hasDrawn
+    !view.turn?.hasDrawn
   ) {
     return (
       <div className="prompt-bar">
         {lastReject && <div className="reject-toast">{lastReject}</div>}
         <p className="prompt-title">Your turn — draw</p>
         <p className="prompt-hint">
-          {state.phase === 'FINAL_ROUND' ? 'Final round after Cambeo.' : 'Or call Cambeo before drawing.'}
+          {view.phase === 'FINAL_ROUND' ? 'Final round after Cambeo.' : 'Or call Cambeo before drawing.'}
         </p>
         <div className="btn-row">
           <button
@@ -225,7 +218,7 @@ export function PromptBar() {
           >
             Draw discard
           </button>
-          {state.phase === 'TURN_DRAW' && (
+          {view.phase === 'TURN_DRAW' && (
             <button
               type="button"
               className="btn btn-danger"
@@ -239,14 +232,14 @@ export function PromptBar() {
     );
   }
 
-  if (state.phase === 'TURN_CHOICE' && isViewerTurn && view.drawnCard) {
+  if (view.phase === 'TURN_CHOICE' && isViewerTurn && view.drawnCard) {
     const drawnKey = view.drawnCard.key;
     const hellLocked =
       drawnKey === 'HELL' && view.ruleSet.hellDiscardOnlyOntoHeaven;
     const heavenLocked =
       drawnKey === 'HEAVEN' &&
       !view.ruleSet.heavenDiscardableAfterCambeo &&
-      state.cambeo !== null;
+      view.cambeoCallerId !== null;
 
     if (hellLocked) {
       return (
@@ -313,7 +306,7 @@ export function PromptBar() {
         {lastReject && <div className="reject-toast">{lastReject}</div>}
         <p className="prompt-title">Keep or discard?</p>
         <p className="prompt-hint">
-          {state.turn?.drawnFrom === 'DISCARD'
+          {view.turn?.drawnFrom === 'DISCARD'
             ? 'Drawn from discard — power will not fire if you discard it.'
             : 'Discard to use its power, or replace one of your cards.'}
         </p>
@@ -341,18 +334,15 @@ export function PromptBar() {
     );
   }
 
-  // Waiting / spectating as another seat
   return (
     <div className="prompt-bar">
       {lastReject && <div className="reject-toast">{lastReject}</div>}
       <p className="prompt-title">
-        {state.turn
-          ? `${name(state.turn.playerId)}'s turn`
-          : state.phase}
+        {view.turn
+          ? `${name(view.turn.playerId)}'s turn`
+          : view.phase}
       </p>
-      <p className="prompt-hint">
-        Tap any card to attempt a flip. Switch seat to play as someone else.
-      </p>
+      <p className="prompt-hint">Tap any card to attempt a flip.</p>
     </div>
   );
 }

@@ -1,13 +1,13 @@
 'use client';
 
 import { CardFace } from '@/components/CardFace';
-import { useGame } from '@/lib/game-store';
+import { useGame } from '@/lib/play-context';
 
 export function Scoring() {
-  const { state, view, names, rematch, ruleSet } = useGame();
-  if (!state || !view || state.phase !== 'OVER' || !state.result) return null;
+  const { view, names, rematch, ruleSet, playMode } = useGame();
+  if (!view || view.phase !== 'OVER' || !view.result) return null;
 
-  const { totals, winnerIds, callerBeaten } = state.result;
+  const { totals, winnerIds, callerBeaten } = view.result;
 
   return (
     <div className="panel">
@@ -15,13 +15,13 @@ export function Scoring() {
       <p className="prompt-hint" style={{ marginBottom: '1rem' }}>
         {callerBeaten
           ? 'Someone tied or beat the caller.'
-          : state.cambeo
-            ? `${names[state.cambeo.callerId] ?? 'Caller'} held the lead.`
+          : view.cambeoCallerId
+            ? `${names[view.cambeoCallerId] ?? 'Caller'} held the lead.`
             : 'Lowest total wins.'}
       </p>
 
       <div className="scoring-grid">
-        {state.seating.map((id) => (
+        {view.seating.map((id) => (
           <div
             key={id}
             className="score-row"
@@ -31,7 +31,7 @@ export function Scoring() {
               <span>
                 {names[id] ?? id}
                 {winnerIds.includes(id) ? ' · winner' : ''}
-                {state.cambeo?.callerId === id ? ' · called' : ''}
+                {view.cambeoCallerId === id ? ' · called' : ''}
               </span>
               <span>{totals[id]} pts</span>
             </div>
@@ -44,11 +44,13 @@ export function Scoring() {
         ))}
       </div>
 
-      <div className="btn-row" style={{ marginTop: '1rem' }}>
-        <button type="button" className="btn btn-primary" onClick={rematch}>
-          Rematch (same players, {ruleSet.jokers ? 'House Rules' : 'rules'})
-        </button>
-      </div>
+      {playMode === 'hotseat' && (
+        <div className="btn-row" style={{ marginTop: '1rem' }}>
+          <button type="button" className="btn btn-primary" onClick={rematch}>
+            Rematch (same players, {ruleSet.jokers ? 'House Rules' : 'rules'})
+          </button>
+        </div>
+      )}
     </div>
   );
 }

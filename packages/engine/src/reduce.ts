@@ -6,7 +6,7 @@ import { startGame, ackPeek, reject } from './setup.js';
 import { drawDeck, drawDiscard, discardDrawn, replaceCard, keepDrawn } from './turn.js';
 import { resolvePowerTarget } from './powers.js';
 import { flipAttempt, giveCard } from './flip.js';
-import { callCambeo } from './cambeo.js';
+import { callCambeo, passTurn } from './cambeo.js';
 
 /**
  * Pure rules reducer. Deterministic given seed/rng cursor.
@@ -44,6 +44,8 @@ export function reduce(
       return giveCard(state, action, ruleSet, rng);
     case 'CALL_CAMBEO':
       return callCambeo(state, action, ruleSet, rng);
+    case 'PASS_TURN':
+      return passTurn(state, action, ruleSet, rng);
     default: {
       const _exhaustive: never = action;
       return reject(state, 'unknown', 'UNKNOWN', `Unknown action ${JSON.stringify(_exhaustive)}`);

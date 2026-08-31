@@ -4,13 +4,15 @@ A browser-based, real-time multiplayer implementation of Cambeo (house-ruled Cam
 
 ## Status
 
-Rules engine, shared `RuleSet`, and a local hot-seat UI are in place. Room server, multiplayer websockets, and card assets are not started yet.
+Rules engine, shared `RuleSet`, hot-seat UI, and a Cloudflare Worker room server (websockets, redaction, reconnect) are in place. Polished lobby/settings and card assets are not started yet.
 
 ## Docs
 
 - [House rules](docs/cambeo-rules.md) — game behavior (source of truth)
 - [App spec](docs/cambeo-app-spec.md) — product and technical requirements
+- [Wire protocol](docs/protocol.md) — client ↔ room server messages
 - [CLAUDE.md](CLAUDE.md) — project conventions for agents and contributors
+- [Server README](packages/server/README.md) — wrangler / Durable Objects
 
 ## Quick start
 
@@ -18,25 +20,30 @@ Requires Node 22+ and pnpm 9+.
 
 ```bash
 pnpm install
-pnpm dev    # hot-seat UI → http://localhost:3000
+pnpm dev          # Next.js UI → http://localhost:3000
 pnpm test
 pnpm check
 ```
+
+### Multiplayer (two terminals)
+
+```bash
+pnpm dev:server   # wrangler → http://localhost:8787
+pnpm dev          # UI → http://localhost:3000
+```
+
+Then **Create room** on the landing page. Two tabs in the same browser are two players (player id is per-tab `sessionStorage`). Refresh reconnects that tab. Hot-seat (no server) is at `/hotseat`.
+
+If create-room fails, the worker is not running.
 
 ## Packages
 
 | Package | Role |
 | --- | --- |
-| `@cambeo/shared` | Card keys, powers, zod `RuleSet`, House Rules preset |
+| `@cambeo/shared` | Card keys, powers, zod `RuleSet`, House Rules, wire protocol |
 | `@cambeo/engine` | Deterministic authoritative rules engine |
-| `@cambeo/web` | Next.js hot-seat UI driving the engine in-browser |
-
-## Hot-seat play
-
-1. Add at least 3 player names and start.
-2. Pass the device; use the seat chips to switch whose view you see.
-3. Peek and ack each player, then take turns: draw, discard/replace, powers, flips, Cambeo.
-4. Tap any card to attempt a flip (unless a prompt asks you to select a target instead).
+| `@cambeo/server` | Cloudflare Worker + Durable Object rooms |
+| `@cambeo/web` | Next.js UI (online + hot-seat) |
 
 ## License
 

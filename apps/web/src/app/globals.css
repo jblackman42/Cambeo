@@ -506,6 +506,28 @@ button {
   font-weight: 650;
 }
 
+.dot-on,
+.dot-off {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: middle;
+}
+
+.dot-on {
+  background: #7dcea0;
+}
+
+.dot-off {
+  background: rgba(247, 243, 234, 0.35);
+}
+
+a {
+  color: var(--amber);
+}
+
 @media (min-width: 600px) {
   .card {
     --w: 84px;

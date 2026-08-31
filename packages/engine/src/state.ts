@@ -1,7 +1,7 @@
-import type { CardKey, PowerId, Suit } from '@cambeo/shared';
+import type { CardKey, PowerId, PowerTarget, Suit } from '@cambeo/shared';
 import type { CardId, PlayerId } from '@cambeo/shared';
 
-export type { CardId, PlayerId };
+export type { CardId, PlayerId, PowerTarget };
 
 export interface Card {
   id: CardId;
@@ -19,12 +19,6 @@ export interface TurnState {
   hasDrawn: boolean;
   drawnFrom: 'DECK' | 'DISCARD' | null;
 }
-
-export type PowerTarget =
-  | { kind: 'CARD'; playerId: PlayerId; slotIndex: number }
-  | { kind: 'PLAYER'; playerId: PlayerId }
-  | { kind: 'CONFIRM'; swap: boolean }
-  | { kind: 'SKIP' };
 
 export interface PendingPower {
   playerId: PlayerId;

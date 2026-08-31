@@ -3,3 +3,6 @@ export * from './powers.js';
 export * from './ruleset.js';
 export * from './presets.js';
 export * from './view.js';
+export * from './action.js';
+export * from './events.js';
+export * from './protocol.js';

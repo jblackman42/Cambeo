@@ -16,8 +16,8 @@ const body = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: 'Cambeo — hot seat',
-  description: 'Local hot-seat Cambeo driving the rules engine directly',
+  title: 'Cambeo',
+  description: 'Real-time multiplayer Cambeo (house-ruled Cambio)',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

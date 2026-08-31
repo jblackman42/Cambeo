@@ -1,21 +1,21 @@
 'use client';
 
-import { useGame } from '@/lib/game-store';
+import { useGame } from '@/lib/play-context';
 
 export function SeatSwitcher() {
-  const { state, viewerId, setViewerId, names } = useGame();
-  if (!state) return null;
+  const { view, viewerId, setViewerId, names, playMode } = useGame();
+  if (!view || playMode !== 'hotseat') return null;
 
   return (
     <div className="seat-bar" role="tablist" aria-label="Switch seat">
-      {state.seating.map((id) => (
+      {view.seating.map((id) => (
         <button
           key={id}
           type="button"
           role="tab"
           className="seat-chip"
           data-active={viewerId === id}
-          data-turn={state.turn?.playerId === id}
+          data-turn={view.turn?.playerId === id}
           aria-selected={viewerId === id}
           onClick={() => setViewerId(id)}
         >

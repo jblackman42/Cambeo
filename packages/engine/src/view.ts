@@ -1,4 +1,10 @@
-import { cardValue, type RedactedGameView, type SlotView, type RuleSet } from '@cambeo/shared';
+import {
+  cardValue,
+  type GameEvent,
+  type RedactedGameView,
+  type SlotView,
+  type RuleSet,
+} from '@cambeo/shared';
 import type { GameState, PlayerId } from './state.js';
 import { getCard } from './setup.js';
 import { knows } from './knowledge.js';
@@ -15,6 +21,43 @@ function slotView(state: GameState, viewerId: PlayerId, cardId: string, ruleSet:
     };
   }
   return { id: cardId, known: false };
+}
+
+/**
+ * Strip face identities the viewer is not entitled to know.
+ * Opaque card ids may remain (they already appear as hidden slots).
+ */
+export function redactEvents(
+  state: GameState,
+  viewerId: PlayerId,
+  events: GameEvent[],
+): GameEvent[] {
+  return events.map((event) => redactEvent(state, viewerId, event));
+}
+
+function redactEvent(state: GameState, viewerId: PlayerId, event: GameEvent): GameEvent {
+  switch (event.type) {
+    case 'POWER_REVEAL': {
+      if (knows(state, viewerId, event.cardId)) return event;
+      return {
+        type: 'POWER_REVEAL',
+        playerId: event.playerId,
+        targetPlayerId: event.targetPlayerId,
+        slotIndex: event.slotIndex,
+        cardId: event.cardId,
+      };
+    }
+    case 'CARD_DRAWN': {
+      if (event.playerId === viewerId) return event;
+      return {
+        type: 'CARD_DRAWN',
+        playerId: event.playerId,
+        from: event.from,
+      };
+    }
+    default:
+      return event;
+  }
 }
 
 export function viewFor(
@@ -93,5 +136,7 @@ export function viewFor(
     overThreshold: [...state.overThreshold],
     result: state.result,
     ruleSet,
+    ackedPeek: [...state.ackedPeek],
+    lastEvents: redactEvents(state, viewerId, state.lastEvents),
   };
 }

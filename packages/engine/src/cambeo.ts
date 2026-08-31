@@ -137,6 +137,36 @@ export function advanceAfterTurnAction(
   );
 }
 
+/**
+ * Skip an undrawn turn. Used by the room server when a player times out disconnected.
+ * Legal only on your turn before drawing (TURN_DRAW or FINAL_ROUND).
+ */
+export function passTurn(
+  state: GameState,
+  action: Extract<Action, { type: 'PASS_TURN' }>,
+  ruleSet: RuleSet,
+  rng: Rng,
+): GameState {
+  if (state.phase === 'GIVE_CARD_PENDING') {
+    return reject(state, action.playerId, 'PASS_TURN', 'Must give a card first');
+  }
+  if (state.phase === 'POWER_TARGETING') {
+    return reject(state, action.playerId, 'PASS_TURN', 'Must finish power first');
+  }
+  if (state.phase !== 'TURN_DRAW' && state.phase !== 'FINAL_ROUND') {
+    return reject(state, action.playerId, 'PASS_TURN', 'Cannot pass now');
+  }
+  if (!state.turn || state.turn.playerId !== action.playerId) {
+    return reject(state, action.playerId, 'PASS_TURN', 'Not your turn');
+  }
+  if (state.turn.hasDrawn) {
+    return reject(state, action.playerId, 'PASS_TURN', 'Already drawn');
+  }
+
+  const events: GameEvent[] = [{ type: 'TURN_PASSED', playerId: action.playerId }];
+  return advanceAfterTurnAction({ ...state, lastEvents: events }, ruleSet, rng);
+}
+
 export function nextPlayerId(state: GameState, from: PlayerId): PlayerId {
   const idx = state.seating.indexOf(from);
   return state.seating[(idx + 1) % state.seating.length]!;

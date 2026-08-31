@@ -22,11 +22,11 @@ Also: `Math.random` is banned in `packages/engine` and `packages/shared` (ESLint
 ## Workspace layout
 
 ```
-packages/shared   RuleSet zod schema, card keys, power ids, House Rules preset, view wire types
+packages/shared   RuleSet zod schema, card keys, power ids, House Rules preset, view wire types, protocol
 packages/engine   Pure rules engine: reduce(state, action, ruleSet, rng) => state
-apps/web          Next.js App Router hot-seat UI (drives engine directly)
-packages/server   (not yet) Cloudflare Worker + Durable Object
-docs/             Game rules + app spec
+apps/web          Next.js App Router UI (online rooms + /hotseat)
+packages/server   Cloudflare Worker + Durable Object (one DO per room)
+docs/             Game rules + app spec + protocol
 ```
 
 Stack: pnpm workspaces, Node 22 (see `.nvmrc`), TypeScript strict, vitest, ESLint, Prettier.
@@ -35,7 +35,8 @@ Stack: pnpm workspaces, Node 22 (see `.nvmrc`), TypeScript strict, vitest, ESLin
 
 ```bash
 pnpm install
-pnpm dev           # hot-seat UI at http://localhost:3000
+pnpm dev           # Next.js UI at http://localhost:3000
+pnpm dev:server    # wrangler room worker at http://localhost:8787
 pnpm test          # vitest run
 pnpm test:watch
 pnpm typecheck
@@ -44,6 +45,10 @@ pnpm format
 pnpm check         # typecheck + lint + test
 ```
 
+`pnpm --filter @cambeo/server dev` is the same as `pnpm dev:server`. Run it **and** `pnpm dev` for multiplayer.
+
+## Engine notes
+
 ## Engine notes
 
 - Signature: `reduce(state, action, ruleSet, rng) => state`
@@ -51,6 +56,7 @@ pnpm check         # typecheck + lint + test
 - Owns full authoritative state including every face-down card identity.
 - Emits `lastEvents` per action for later fan-out / animation.
 - Illegal actions do not throw; they return prior state with `ACTION_REJECTED`.
+- `PASS_TURN` skips an undrawn turn (room-server disconnect timeout). No Pass button in the UI.
 - Heaven/hell special rules and loss-threshold elimination: heaven/hell are implemented
   (see `jokers.ts` and RuleSet flags). Loss-threshold elimination remains unresolved
   (spec 11). See skipped tests in `open-questions.test.ts`.

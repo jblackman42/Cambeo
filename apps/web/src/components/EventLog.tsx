@@ -1,7 +1,7 @@
 'use client';
 
-import type { GameEvent } from '@cambeo/engine';
-import { useGame } from '@/lib/game-store';
+import type { GameEvent } from '@cambeo/shared';
+import { useGame } from '@/lib/play-context';
 
 function describe(event: GameEvent, names: Record<string, string>): string {
   const n = (id: string) => names[id] ?? id;
@@ -12,6 +12,8 @@ function describe(event: GameEvent, names: Record<string, string>): string {
       return 'Game started';
     case 'TURN_STARTED':
       return `${n(event.playerId)}'s turn`;
+    case 'TURN_PASSED':
+      return `${n(event.playerId)} passed`;
     case 'CARD_DRAWN':
       return `${n(event.playerId)} drew from ${event.from.toLowerCase()}`;
     case 'CARD_DISCARDED':
@@ -54,10 +56,10 @@ function describe(event: GameEvent, names: Record<string, string>): string {
 }
 
 export function EventLog() {
-  const { state, names } = useGame();
-  if (!state) return null;
+  const { view, names } = useGame();
+  if (!view) return null;
 
-  const events = state.lastEvents.filter((e) => e.type !== 'PHASE_CHANGED');
+  const events = view.lastEvents.filter((e) => e.type !== 'PHASE_CHANGED');
 
   return (
     <div className="panel">

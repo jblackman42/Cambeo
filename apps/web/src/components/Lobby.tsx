@@ -7,6 +7,7 @@ const DEFAULT_NAMES = ['Alex', 'Blair', 'Casey'];
 
 export function Lobby() {
   const { ruleSet, resetLobby } = useGame();
+  if (!resetLobby) return null;
   const [names, setNames] = useState<string[]>(DEFAULT_NAMES);
 
   const canStart = names.length >= ruleSet.minPlayers && names.every((n) => n.trim().length > 0);

@@ -92,7 +92,8 @@ export function validateForTable(ruleSet: RuleSet, playerCount: number): TableVa
   const parsed = RuleSetSchema.safeParse(ruleSet);
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {
-      errors.push(issue.message);
+      const where = issue.path.join('.');
+      errors.push(where ? `${where}: ${issue.message}` : issue.message);
     }
     return { ok: false, errors };
   }

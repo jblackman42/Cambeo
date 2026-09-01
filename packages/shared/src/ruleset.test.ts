@@ -5,6 +5,7 @@ import {
   decodeRuleSetCode,
   encodeRuleSetCode,
   isHouseRules,
+  repairRuleSet,
   ruleSetsEqual,
 } from './ruleset-codec.js';
 import { RuleSetSchema, summarizeDeck, validateForTable } from './ruleset.js';
@@ -43,7 +44,49 @@ describe('RuleSet schema', () => {
   });
 });
 
+describe('repairRuleSet', () => {
+  const stale = () => {
+    const partial: Record<string, unknown> = { ...HOUSE_RULES };
+    delete partial.initialPeekDurationMs;
+    delete partial.powerRevealDurationMs;
+    return partial;
+  };
+
+  it('fills fields a ruleset from an older build is missing', () => {
+    expect(repairRuleSet(stale())).toEqual(HOUSE_RULES);
+  });
+
+  it('keeps custom settings while filling the gaps', () => {
+    const partial = stale();
+    partial.jokers = false;
+    partial.handSize = 5;
+    const repaired = repairRuleSet(partial);
+    expect(repaired.jokers).toBe(false);
+    expect(repaired.handSize).toBe(5);
+    expect(repaired.initialPeekDurationMs).toBe(HOUSE_RULES.initialPeekDurationMs);
+  });
+
+  it('falls back to House Rules for junk', () => {
+    expect(repairRuleSet(undefined)).toEqual(HOUSE_RULES);
+    expect(repairRuleSet({ ...HOUSE_RULES, handSize: 99 })).toEqual(HOUSE_RULES);
+  });
+
+  it('leaves a valid ruleset alone', () => {
+    const custom = cloneRuleSet(HOUSE_RULES);
+    custom.initialPeekDurationMs = 3000;
+    expect(repairRuleSet(custom)).toEqual(custom);
+  });
+});
+
 describe('validateForTable', () => {
+  it('names the offending field when the schema fails', () => {
+    const partial: Record<string, unknown> = { ...HOUSE_RULES };
+    delete partial.initialPeekDurationMs;
+    const result = validateForTable(partial as never, 3);
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toContain('initialPeekDurationMs');
+  });
+
   it('refuses a deck that cannot deal plus one leftover', () => {
     const cramped = {
       ...HOUSE_RULES,

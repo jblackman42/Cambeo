@@ -1,5 +1,5 @@
 import type { Action, ClientMessage, PlayerId, RedactedGameView, RoomErrorCode, RoomView, RuleSet, ServerMessage } from '@cambeo/shared';
-import { HOUSE_RULES, tryParseClientMessage, type GameEvent } from '@cambeo/shared';
+import { HOUSE_RULES, repairRuleSet, tryParseClientMessage, type GameEvent } from '@cambeo/shared';
 import { createGame, createRng, reduce, viewFor, type GameState } from '@cambeo/engine';
 import { disconnectAction, nextTimeoutTarget } from './timeout.js';
 
@@ -66,7 +66,8 @@ export class RoomController {
 
   static deserialize(data: SerializedRoom, deps: RoomDeps): RoomController {
     const room = new RoomController(data.roomCode, deps, {
-      ruleSet: data.ruleSet,
+      // Storage can predate the current RuleSet shape; fill gaps rather than strand the room.
+      ruleSet: repairRuleSet(data.ruleSet),
       turnTimeoutMs: data.turnTimeoutMs,
     });
     room.hostId = data.hostId;

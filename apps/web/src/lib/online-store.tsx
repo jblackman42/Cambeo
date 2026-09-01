@@ -1,7 +1,7 @@
 'use client';
 
 import type { Action, PlayerId, RoomView, ServerMessage } from '@cambeo/shared';
-import { HOUSE_RULES } from '@cambeo/shared';
+import { repairRuleSet } from '@cambeo/shared';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PlayProvider, deriveMode, type InteractionMode, type PlayStore } from '@/lib/play-context';
 import { getSessionPlayerId, getUsername, setSessionPlayerId, workerWsUrl } from '@/lib/session';
@@ -150,12 +150,16 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
     return map;
   }, [room]);
 
+  // A server on an older build can send a RuleSet missing newer fields; fill it in so the
+  // lobby stays usable instead of failing validation with a bare schema error.
+  const ruleSet = useMemo(() => repairRuleSet(room?.ruleSet), [room?.ruleSet]);
+
   const view = room?.game ?? null;
   const effectiveViewer = viewerId || room?.you.playerId || '';
 
   const value: PlayStore = {
     playMode: 'online',
-    ruleSet: room?.ruleSet ?? HOUSE_RULES,
+    ruleSet,
     viewerId: effectiveViewer,
     names,
     view,

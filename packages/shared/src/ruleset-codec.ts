@@ -1,7 +1,7 @@
 import { CARD_KEYS, type CardKey } from './cards.js';
 import { HOUSE_RULES } from './presets.js';
 import type { PowerId } from './powers.js';
-import { parseRuleSet, type RuleSet } from './ruleset.js';
+import { RuleSetSchema, parseRuleSet, type RuleSet } from './ruleset.js';
 
 const CODE_PREFIX = 'c1';
 
@@ -139,6 +139,28 @@ export function ruleSetsEqual(a: RuleSet, b: RuleSet): boolean {
 
 export function cloneRuleSet(ruleSet: RuleSet): RuleSet {
   return parseRuleSet(JSON.parse(JSON.stringify(ruleSet)) as unknown);
+}
+
+/**
+ * Best-effort read of a RuleSet that may predate the current schema — a room persisted by an
+ * older server, or a saved ruleset from an older client. Anything missing falls back to House
+ * Rules so a stale field cannot leave a room permanently unstartable; customisations survive.
+ */
+export function repairRuleSet(input: unknown): RuleSet {
+  const parsed = RuleSetSchema.safeParse(input);
+  if (parsed.success) return parsed.data;
+  if (!isPatchObject(input)) return cloneRuleSet(HOUSE_RULES);
+
+  const defined = Object.fromEntries(
+    Object.entries(input).filter(([, value]) => value !== undefined),
+  );
+  const merged = RuleSetSchema.safeParse({
+    ...HOUSE_RULES,
+    ...defined,
+    values: { ...HOUSE_RULES.values, ...input.values },
+    powers: { ...HOUSE_RULES.powers, ...input.powers },
+  });
+  return merged.success ? merged.data : cloneRuleSet(HOUSE_RULES);
 }
 
 export function isHouseRules(ruleSet: RuleSet): boolean {

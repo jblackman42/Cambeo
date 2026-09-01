@@ -150,6 +150,27 @@ function shouldAbortPowerOnSkip(
   return false;
 }
 
+/**
+ * Enter POWER_TARGETING for a power that just fired, resolving any leading step
+ * that has no legal target. A peek-own with an empty hand, or a spy when only
+ * the cambeo caller holds cards, has nothing to ask the actor: it resolves here
+ * instead of parking the turn on a prompt with no legal answer.
+ */
+export function beginPower(
+  state: GameState,
+  pending: PendingPower,
+  events: GameEvent[],
+  ruleSet: RuleSet,
+  rng: Rng,
+): GameState {
+  return skipImpossibleSteps(
+    { ...state, phase: 'POWER_TARGETING', pendingPower: pending },
+    events,
+    ruleSet,
+    rng,
+  );
+}
+
 export function resolvePowerTarget(
   state: GameState,
   action: Extract<Action, { type: 'RESOLVE_POWER_TARGET' }>,
@@ -313,33 +334,22 @@ export function resolvePowerTarget(
     }
   }
 
-  if (nextStepIndex >= definition.steps.length) {
-    return completePower(
-      {
-        ...next,
-        pendingPower: {
-          ...pending,
-          stepIndex: nextStepIndex,
-          selections,
-          revealedForOptionalSwap,
-        },
+  // Completes the power when the steps run out, and rolls past any following
+  // step the board can no longer satisfy.
+  return skipImpossibleSteps(
+    {
+      ...next,
+      pendingPower: {
+        ...pending,
+        stepIndex: nextStepIndex,
+        selections,
+        revealedForOptionalSwap,
       },
-      events,
-      ruleSet,
-      rng,
-    );
-  }
-
-  next = {
-    ...next,
-    pendingPower: {
-      ...pending,
-      stepIndex: nextStepIndex,
-      selections,
-      revealedForOptionalSwap,
     },
-  };
-  return withRng(next, rng, events);
+    events,
+    ruleSet,
+    rng,
+  );
 }
 
 function completePower(

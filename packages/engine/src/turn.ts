@@ -5,6 +5,7 @@ import type { CardId, GameState, PlayerId } from './state.js';
 import type { Rng } from './rng.js';
 import { getCard, powerForCard, reject, withRng } from './setup.js';
 import { advanceAfterTurnAction } from './cambeo.js';
+import { beginPower } from './powers.js';
 import { maybeFlagLossThreshold } from './scoring.js';
 import { specialCardHooks } from './extensions/heavenHell.js';
 import { assertHellDiscardInvariant, canPlaceOnDiscard } from './jokers.js';
@@ -212,18 +213,19 @@ export function discardDrawn(
       sourceCardId: cardId,
     });
     events.push({ type: 'PHASE_CHANGED', from: 'TURN_CHOICE', to: 'POWER_TARGETING' });
-    next = {
-      ...next,
-      phase: 'POWER_TARGETING',
-      pendingPower: {
+    return beginPower(
+      next,
+      {
         playerId: action.playerId,
         powerId,
         sourceCardId: cardId,
         stepIndex: 0,
         selections: [],
       },
-    };
-    return withRng(next, rng, events);
+      events,
+      ruleSet,
+      rng,
+    );
   }
 
   next = { ...next, phase: 'TURN_DRAW' };

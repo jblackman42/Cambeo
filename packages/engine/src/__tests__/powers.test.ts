@@ -168,7 +168,28 @@ describe('powers', () => {
     expect(state.players[P2]!.hand[0]).toBe(ownId);
   });
 
-  it('LOOK_THEN_BLIND_SWAP skip when cambeo lock and empty hands leave no look or swap', () => {
+  it('PEEK_OWN with an empty hand resolves without stranding the turn', () => {
+    let state = startStacked({
+      hands: {
+        p1: [],
+        p2: [{ key: '5' }, { key: 'K_RED' }],
+        p3: [{ key: '9' }, { key: 'K_BLACK' }],
+      },
+      deck: [{ key: '6' }, { key: '2' }],
+      discard: [{ key: 'K_BLACK' }],
+    });
+    state = apply(state, { type: 'DRAW_DECK', playerId: P1 });
+    state = apply(state, { type: 'DISCARD_DRAWN', playerId: P1 });
+
+    expect(rejected(state)).toBe(false);
+    expect(hasEvent(state, 'POWER_STEP_SKIPPED')).toBe(true);
+    expect(hasEvent(state, 'POWER_COMPLETED')).toBe(true);
+    expect(state.pendingPower).toBeNull();
+    expect(state.phase).toBe('TURN_DRAW');
+    expect(state.turn?.playerId).toBe(P2);
+  });
+
+  it('LOOK_THEN_BLIND_SWAP resolves itself when cambeo lock and empty hands leave no look or swap', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'Q_RED' }],
@@ -183,23 +204,16 @@ describe('powers', () => {
     state = apply(state, { type: 'DISCARD_DRAWN', playerId: P2 });
     state = apply(state, { type: 'DRAW_DECK', playerId: P3 });
     state = apply(state, { type: 'DISCARD_DRAWN', playerId: P3 });
-    expect(state.pendingPower?.powerId).toBe('LOOK_THEN_BLIND_SWAP');
-    expect(state.phase).toBe('POWER_TARGETING');
 
-    const skipped = apply(state, {
-      type: 'RESOLVE_POWER_TARGET',
-      playerId: P3,
-      target: { kind: 'SKIP' },
-    });
-    expect(rejected(skipped)).toBe(false);
-    expect(hasEvent(skipped, 'POWER_STEP_SKIPPED')).toBe(true);
-    expect(hasEvent(skipped, 'POWER_COMPLETED')).toBe(true);
-    expect(hasEvent(skipped, 'POWER_SWAP')).toBe(false);
-    expect(skipped.pendingPower).toBeNull();
-    expect(skipped.phase).toBe('OVER');
+    expect(rejected(state)).toBe(false);
+    expect(hasEvent(state, 'POWER_STEP_SKIPPED')).toBe(true);
+    expect(hasEvent(state, 'POWER_COMPLETED')).toBe(true);
+    expect(hasEvent(state, 'POWER_SWAP')).toBe(false);
+    expect(state.pendingPower).toBeNull();
+    expect(state.phase).toBe('OVER');
   });
 
-  it('LOOK_THEN_BLIND_SWAP skips a locked look then still swaps own cards', () => {
+  it('LOOK_THEN_BLIND_SWAP auto-skips a locked look and still offers the swap', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'Q_RED' }, { key: 'A' }, { key: '2' }, { key: '3' }],
@@ -215,15 +229,8 @@ describe('powers', () => {
     state = apply(state, { type: 'DRAW_DECK', playerId: P3 });
     state = apply(state, { type: 'DISCARD_DRAWN', playerId: P3 });
     expect(state.pendingPower?.powerId).toBe('LOOK_THEN_BLIND_SWAP');
-    expect(state.pendingPower?.stepIndex).toBe(0);
-
-    state = apply(state, {
-      type: 'RESOLVE_POWER_TARGET',
-      playerId: P3,
-      target: { kind: 'SKIP' },
-    });
-    expect(rejected(state)).toBe(false);
     expect(state.pendingPower?.stepIndex).toBe(1);
+    expect(hasEvent(state, 'POWER_STEP_SKIPPED')).toBe(true);
     expect(hasEvent(state, 'POWER_COMPLETED')).toBe(false);
 
     const aId = state.players[P3]!.hand[0]!;
@@ -243,7 +250,7 @@ describe('powers', () => {
     expect(state.players[P3]!.hand[1]).toBe(aId);
   });
 
-  it('BLIND_SWAP skip when fewer than two legal cards remain', () => {
+  it('BLIND_SWAP resolves itself when fewer than two legal cards remain', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'Q_RED' }],
@@ -256,18 +263,15 @@ describe('powers', () => {
     state = apply(state, { type: 'CALL_CAMBEO', playerId: P1 });
     state = apply(state, { type: 'DRAW_DECK', playerId: P2 });
     state = apply(state, { type: 'DISCARD_DRAWN', playerId: P2 });
-    expect(state.pendingPower?.powerId).toBe('BLIND_SWAP');
-    state = apply(state, {
-      type: 'RESOLVE_POWER_TARGET',
-      playerId: P2,
-      target: { kind: 'SKIP' },
-    });
+
     expect(rejected(state)).toBe(false);
+    expect(state.pendingPower).toBeNull();
+    expect(hasEvent(state, 'POWER_STEP_SKIPPED')).toBe(true);
     expect(hasEvent(state, 'POWER_COMPLETED')).toBe(true);
     expect(hasEvent(state, 'POWER_SWAP')).toBe(false);
   });
 
-  it('PEEK_OTHER skip when the only other cards belong to the cambeo caller', () => {
+  it('PEEK_OTHER resolves itself when the only other cards belong to the cambeo caller', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'Q_RED' }],
@@ -280,13 +284,10 @@ describe('powers', () => {
     state = apply(state, { type: 'CALL_CAMBEO', playerId: P1 });
     state = apply(state, { type: 'DRAW_DECK', playerId: P2 });
     state = apply(state, { type: 'DISCARD_DRAWN', playerId: P2 });
-    expect(state.pendingPower?.powerId).toBe('PEEK_OTHER');
-    state = apply(state, {
-      type: 'RESOLVE_POWER_TARGET',
-      playerId: P2,
-      target: { kind: 'SKIP' },
-    });
+
     expect(rejected(state)).toBe(false);
+    expect(state.pendingPower).toBeNull();
+    expect(hasEvent(state, 'POWER_STEP_SKIPPED')).toBe(true);
     expect(hasEvent(state, 'POWER_COMPLETED')).toBe(true);
   });
 

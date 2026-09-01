@@ -139,6 +139,7 @@ Flipping is legal in every phase except `SCORING` and `OVER`, which is the main 
 - Wrong flip pushes a player over the loss threshold.
 - Two flip attempts on the same discard, second one rejected even if also correct.
 - A player reaches zero cards, keeps taking turns, and can still call cambeo.
+- A power fires with no legal target for its next step (peek own at zero cards, spy when only the cambeo caller holds any). The engine resolves the step itself and never parks the turn on a prompt with no legal answer.
 - Deck runs out mid-draw and the discard pile is reshuffled into it.
 - Deck runs out with an empty or single-card discard pile.
 - Tie between the caller and another player resolves in favor of the non-caller.
@@ -328,6 +329,7 @@ Do **not** inline the SVGs into the bundle. Do not load face cards lazily on fir
 - When the deck runs out, the discard pile is shuffled and becomes the new deck.
 - A correct flip on another player's card **requires** giving them a card. With zero cards in hand, the target draws a blind card from the deck instead.
 - Reaching zero cards does not end or win the game. That player keeps playing and may call cambeo or keep drawing for negatives.
+- A power step with no legal target is skipped by the engine as the step is reached, emitting `POWER_STEP_SKIPPED`. A power whose remaining steps are all impossible completes without effect. The actor is never asked to acknowledge a choice that does not exist.
 - There are no eliminated players. The game ends after the final round following a cambeo call.
 - Minimum 3 players.
 

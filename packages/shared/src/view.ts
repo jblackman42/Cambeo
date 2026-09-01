@@ -42,7 +42,7 @@ export interface PendingPowerView {
   powerId: PowerId;
   stepIndex: number;
   /** Step-aligned targets already chosen (card slots are public; identities are not). */
-  selections: PowerTarget[];
+  selections?: PowerTarget[];
 }
 
 export interface PendingGiveView {

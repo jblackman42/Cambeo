@@ -81,14 +81,15 @@ export function isPowerId(value: string): value is PowerId {
 /** Card selections already committed for a given step effect, aligned by step index. */
 export function cardTargetsForEffect(
   powerId: PowerId,
-  selections: ReadonlyArray<{ kind: string; playerId?: string; slotIndex?: number }>,
+  selections: ReadonlyArray<{ kind: string; playerId?: string; slotIndex?: number }> | undefined,
   effect: PowerStepEffect,
 ): Array<{ playerId: string; slotIndex: number }> {
-  const steps = POWER_DEFINITIONS[powerId].steps;
+  const steps = POWER_DEFINITIONS[powerId]?.steps ?? [];
+  const chosen = selections ?? [];
   const out: Array<{ playerId: string; slotIndex: number }> = [];
-  for (let i = 0; i < selections.length; i++) {
+  for (let i = 0; i < chosen.length; i++) {
     const step = steps[i];
-    const target = selections[i];
+    const target = chosen[i];
     if (
       step?.effect === effect &&
       target?.kind === 'CARD' &&
@@ -144,13 +145,14 @@ export function countLegalPowerCardTargets(args: {
 export function powerStepLacksLegalTarget(args: {
   powerId: PowerId;
   stepIndex: number;
-  selections: ReadonlyArray<{ kind: string; playerId?: string; slotIndex?: number }>;
+  selections: ReadonlyArray<{ kind: string; playerId?: string; slotIndex?: number }> | undefined;
   actorId: string;
   cambeoCallerId: string | null;
   seating: readonly string[];
   cardCount: (playerId: string) => number;
 }): boolean {
-  const step = POWER_DEFINITIONS[args.powerId].steps[args.stepIndex];
+  const steps = POWER_DEFINITIONS[args.powerId]?.steps ?? [];
+  const step = steps[args.stepIndex];
   if (!step) return false;
   if (step.kind === 'CONFIRM') return false;
   if (step.kind === 'ANY_PLAYER') {
@@ -172,7 +174,7 @@ export function powerStepLacksLegalTarget(args: {
     exclude,
   });
   if (step.effect === 'SELECT_FOR_SWAP') {
-    const remainingSwapSteps = POWER_DEFINITIONS[args.powerId].steps
+    const remainingSwapSteps = steps
       .slice(args.stepIndex)
       .filter((s) => s.effect === 'SELECT_FOR_SWAP').length;
     return count < remainingSwapSteps;

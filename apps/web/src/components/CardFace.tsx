@@ -52,13 +52,14 @@ export function CardFace({
   const key = face?.key ?? (slot && slot.known ? slot.key : null);
   const suit = face?.suit ?? (slot && slot.known ? slot.suit : null);
   const value = face?.value ?? (slot && slot.known ? slot.value : null);
+  const art = known && key && suit ? cardKeyToAsset(key, suit) : undefined;
 
   const jokerName = key === 'HEAVEN' ? 'Heaven' : key === 'HELL' ? 'Hell' : null;
 
   const content =
-    known && key && suit ? (
+    art ? (
       <>
-        <CardArtImg {...cardKeyToAsset(key, suit)} known />
+        <CardArtImg {...art} known />
         {jokerName && <span className="card-joker-name">{jokerName}</span>}
         {value !== null && (
           <span className="card-value" data-negative={value < 0 ? 'true' : 'false'}>

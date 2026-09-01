@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ActionSchema, HOUSE_RULES, tryParseClientMessage } from './index.js';
+import { HOUSE_RULES, tryParseClientMessage } from './index.js';
 
 describe('protocol', () => {
   it('parses a join message', () => {

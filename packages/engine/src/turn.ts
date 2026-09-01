@@ -3,7 +3,6 @@ import type { Action } from './actions.js';
 import type { GameEvent } from './events.js';
 import type { CardId, GameState, PlayerId } from './state.js';
 import type { Rng } from './rng.js';
-import { grantKnowledge, clearKnowledgeForCards } from './knowledge.js';
 import { getCard, powerForCard, reject, withRng } from './setup.js';
 import { advanceAfterTurnAction } from './cambeo.js';
 import { maybeFlagLossThreshold } from './scoring.js';
@@ -40,12 +39,10 @@ export function ensureDeckHasCard(
   const shuffled = rng.shuffle(rest);
   const events: GameEvent[] = [
     { type: 'DECK_RESHUFFLED', newDeckCount: shuffled.length, discardTopId: top },
-    { type: 'KNOWLEDGE_CLEARED', cardIds: [...rest] },
   ];
 
-  let next = clearKnowledgeForCards(state, rest);
-  next = {
-    ...next,
+  const next = {
+    ...state,
     deck: shuffled,
     discard: [top],
   };
@@ -104,7 +101,6 @@ export function drawDeck(
     { type: 'PHASE_CHANGED', from: state.phase, to: 'TURN_CHOICE' },
   ];
 
-  next = grantKnowledge(next, action.playerId, [drawn.cardId]);
   next = {
     ...next,
     drawnCard: drawn.cardId,
@@ -144,12 +140,11 @@ export function drawDiscard(
     { type: 'PHASE_CHANGED', from: state.phase, to: 'TURN_CHOICE' },
   ];
 
-  let next = grantKnowledge(state, action.playerId, [cardId]);
-  next = {
-    ...next,
+  const next: GameState = {
+    ...state,
     discard,
     drawnCard: cardId,
-    turn: { ...next.turn!, hasDrawn: true, drawnFrom: 'DISCARD' },
+    turn: { ...state.turn!, hasDrawn: true, drawnFrom: 'DISCARD' },
     phase: 'TURN_CHOICE',
   };
 
@@ -208,11 +203,6 @@ export function discardDrawn(
   };
 
   assertHellDiscardInvariant(next, ruleSet);
-
-  // Discard top is public.
-  for (const pid of state.seating) {
-    next = grantKnowledge(next, pid, [cardId]);
-  }
 
   if (triggersPower) {
     events.push({
@@ -303,11 +293,6 @@ export function replaceCard(
 
   assertHellDiscardInvariant(next, ruleSet);
 
-  next = grantKnowledge(next, action.playerId, [newCardId]);
-  for (const pid of state.seating) {
-    next = grantKnowledge(next, pid, [oldCardId]);
-  }
-
   next = { ...next, phase: 'TURN_DRAW' };
   return advanceAfterTurnAction(withRng(next, rng, events), ruleSet, rng);
 }
@@ -348,11 +333,10 @@ export function keepDrawn(
   ];
   if (added.thresholdEvent) events.push(added.thresholdEvent);
 
-  let next: GameState = {
+  const next: GameState = {
     ...added.state,
     phase: 'TURN_DRAW',
   };
-  next = grantKnowledge(next, action.playerId, [cardId]);
   return advanceAfterTurnAction(withRng(next, rng, events), ruleSet, rng);
 }
 
@@ -395,8 +379,7 @@ export function removeCardFromHand(
 }
 
 /**
- * Blind swap: exchange two card slots. Knowledge of both card ids is cleared
- * for everyone (spec: peeked cards stay known until swapped or discarded).
+ * Blind swap: exchange two card slots.
  */
 export function swapSlots(
   state: GameState,
@@ -436,5 +419,5 @@ export function swapSlots(
     };
   }
 
-  return clearKnowledgeForCards(next, [cardA, cardB]);
+  return next;
 }

@@ -5,6 +5,13 @@ import { HOUSE_RULES } from '@cambeo/shared';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PlayProvider, deriveMode, type InteractionMode, type PlayStore } from '@/lib/play-context';
 import { getSessionPlayerId, getUsername, setSessionPlayerId, workerWsUrl } from '@/lib/session';
+import {
+  dismissInitialPeeks as dropInitialPeeks,
+  expireReveals,
+  ingestReveals,
+  nextExpiryAt,
+  type ActiveReveal,
+} from '@/lib/reveals';
 
 export function OnlineProvider({ roomCode, children }: { roomCode: string; children: ReactNode }) {
   const code = roomCode.toUpperCase();
@@ -14,8 +21,17 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
   const [lastError, setLastError] = useState<string | null>(null);
   const [mode, setMode] = useState<InteractionMode>({ kind: 'flip' });
   const [wsStatus, setWsStatus] = useState<PlayStore['wsStatus']>('connecting');
+  const [reveals, setReveals] = useState<ActiveReveal[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
+
+  useEffect(() => {
+    const at = nextExpiryAt(reveals);
+    if (at == null) return undefined;
+    const wait = Math.max(0, at - Date.now());
+    const t = window.setTimeout(() => setReveals((rows) => expireReveals(rows, Date.now())), wait);
+    return () => window.clearTimeout(t);
+  }, [reveals]);
 
   const applyServer = useCallback(
     (msg: ServerMessage) => {
@@ -27,6 +43,7 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
           break;
         case 'snapshot':
         case 'room':
+          if (!msg.room.game) setReveals([]);
           setRoom(msg.room);
           setLastError(null);
           if (msg.room.game) {
@@ -34,6 +51,7 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
           }
           break;
         case 'state':
+          setReveals((rows) => ingestReveals(rows, msg.lastEvents, Date.now()));
           setRoom((prev) =>
             prev ? { ...prev, seq: msg.seq, game: msg.view, lastEvents: msg.lastEvents } : prev,
           );
@@ -120,6 +138,12 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
     [send],
   );
 
+  const dismissInitialPeeks = useCallback(() => {
+    const id = viewerId || room?.you.playerId;
+    if (!id) return;
+    setReveals((rows) => dropInitialPeeks(rows, id));
+  }, [viewerId, room?.you.playerId]);
+
   const names = useMemo(() => {
     const map: Record<PlayerId, string> = {};
     for (const p of room?.players ?? []) map[p.playerId] = p.name;
@@ -149,6 +173,8 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
     resetLobby: null,
     wsStatus,
     lastError,
+    reveals,
+    dismissInitialPeeks,
   };
 
   return <PlayProvider value={value}>{children}</PlayProvider>;

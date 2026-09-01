@@ -11,6 +11,8 @@ interface RuleSetPatch {
   powers?: Partial<Record<CardKey, PowerId>>;
   handSize?: number;
   initialRevealCount?: number;
+  initialPeekDurationMs?: number;
+  powerRevealDurationMs?: number;
   lossThreshold?: number;
   minPlayers?: number;
   maxPlayers?: number;
@@ -22,6 +24,8 @@ const SCALAR_KEYS = [
   'jokers',
   'handSize',
   'initialRevealCount',
+  'initialPeekDurationMs',
+  'powerRevealDurationMs',
   'lossThreshold',
   'minPlayers',
   'maxPlayers',

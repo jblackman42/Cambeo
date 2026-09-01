@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HOUSE_RULES } from '@cambeo/shared';
-import { knows } from '../index.js';
+import { viewFor } from '../index.js';
 import {
   apply,
   hasEvent,
@@ -117,10 +117,12 @@ describe('flip', () => {
     expect(hasEvent(state, 'BLIND_DRAW_FOR_TARGET')).toBe(true);
     expect(state.phase).not.toBe('GIVE_CARD_PENDING');
     expect(state.players[P1]!.hand).toContain(deckTop);
-    expect(knows(state, P1, deckTop)).toBe(false);
+    expect(viewFor(state, P1, HOUSE_RULES).players[P1]!.hand.find((s) => s.id === deckTop)?.known).toBe(
+      false,
+    );
   });
 
-  it('a blind-given card is unknown to its new owner and still known to the giver', () => {
+  it('a given card is not known in either player’s slot view', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
@@ -130,20 +132,22 @@ describe('flip', () => {
       deck: [{ key: 'K_RED' }],
       discard: [{ key: 'A' }],
     });
-    // P2 knows first two of their cards
     const givenId = state.players[P2]!.hand[0]!;
-    expect(knows(state, P2, givenId)).toBe(true);
     state = apply(state, {
       type: 'FLIP_ATTEMPT',
       playerId: P2,
       target: { playerId: P1, slotIndex: 0 },
     });
     state = apply(state, { type: 'GIVE_CARD', playerId: P2, slotIndex: 0 });
-    expect(knows(state, P1, givenId)).toBe(false);
-    expect(knows(state, P2, givenId)).toBe(true);
+    expect(viewFor(state, P1, HOUSE_RULES).players[P1]!.hand.find((s) => s.id === givenId)?.known).toBe(
+      false,
+    );
+    expect(viewFor(state, P2, HOUSE_RULES).players[P1]!.hand.find((s) => s.id === givenId)?.known).toBe(
+      false,
+    );
   });
 
-  it('wrong flip draws a penalty and reveals the card to everyone', () => {
+  it('wrong flip draws a penalty and does not leave the card known in slots', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
@@ -161,9 +165,10 @@ describe('flip', () => {
     });
     expect(hasEvent(state, 'FLIP_FAIL')).toBe(true);
     expect(hasEvent(state, 'PENALTY_DRAWN')).toBe(true);
-    expect(knows(state, P1, flippedId)).toBe(true);
-    expect(knows(state, P2, flippedId)).toBe(true);
-    expect(knows(state, P3, flippedId)).toBe(true);
+    for (const pid of [P1, P2, P3]) {
+      const view = viewFor(state, pid, HOUSE_RULES);
+      expect(view.players[P1]!.hand.find((s) => s.id === flippedId)?.known).toBe(false);
+    }
     expect(state.players[P2]!.hand.length).toBe(5);
   });
 

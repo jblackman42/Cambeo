@@ -1,5 +1,6 @@
 import type { Action, PlayerId, RedactedGameView, RoomPlayerInfo, RuleSet } from '@cambeo/shared';
 import { createContext, useContext, type ReactNode } from 'react';
+import type { ActiveReveal } from '@/lib/reveals';
 
 export type InteractionMode =
   | { kind: 'flip' }
@@ -30,6 +31,8 @@ export interface PlayStore {
   resetLobby: ((names: string[]) => void) | null;
   wsStatus: 'idle' | 'connecting' | 'open' | 'closed' | 'error';
   lastError: string | null;
+  reveals: ActiveReveal[];
+  dismissInitialPeeks: () => void;
 }
 
 const PlayContext = createContext<PlayStore | null>(null);

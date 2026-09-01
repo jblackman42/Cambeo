@@ -1,7 +1,6 @@
 import { flipPenaltyMessage, rankSpokenName } from '@/lib/format';
 import {
   ARM_TIMEOUT_MS,
-  commitFlipAction,
   isRaceLossReason,
   localPhaseFromView,
   powerModeFromView,
@@ -26,26 +25,15 @@ import {
   type ReactNode,
 } from 'react';
 
-export type WrongFlipConfirm = {
-  armed: ArmedFlip;
-  knownKey: CardKey;
-  discardKey: CardKey;
-};
-
 type TableInputValue = {
   localPhase: LocalPhase;
   armed: ArmedFlip | null;
-  confirm: WrongFlipConfirm | null;
   penalty: string | null;
   raceFade: boolean;
   shake: { ownerId: PlayerId; slotIndex: number; token: number } | null;
-  skipWrongFlipConfirm: boolean;
-  setSkipWrongFlipConfirm: (value: boolean) => void;
-  onCardTap: (ownerId: PlayerId, slotIndex: number, cardId: string, knownKey: CardKey | null) => void;
+  onCardTap: (ownerId: PlayerId, slotIndex: number, cardId: string) => void;
   onBackgroundTap: () => void;
   disarm: () => void;
-  confirmWrongFlip: () => void;
-  cancelConfirm: () => void;
   dismissPenalty: () => void;
   lastOutbound: unknown | null;
 };
@@ -61,8 +49,6 @@ export function useTableInput(): TableInputValue {
 export function TableInputProvider({ children }: { children: ReactNode }) {
   const { view, viewerId, dispatch, lastReject } = useGame();
   const [armed, setArmed] = useState<ArmedFlip | null>(null);
-  const [confirm, setConfirm] = useState<WrongFlipConfirm | null>(null);
-  const [skipWrongFlipConfirm, setSkipWrongFlipConfirm] = useState(false);
   const [penalty, setPenalty] = useState<string | null>(null);
   const [raceFade, setRaceFade] = useState(false);
   const [shake, setShake] = useState<{ ownerId: PlayerId; slotIndex: number; token: number } | null>(
@@ -78,7 +64,6 @@ export function TableInputProvider({ children }: { children: ReactNode }) {
 
   const disarm = useCallback(() => {
     setArmed(null);
-    setConfirm(null);
   }, []);
 
   useEffect(() => {
@@ -152,24 +137,14 @@ export function TableInputProvider({ children }: { children: ReactNode }) {
     (result: CardTapResult) => {
       switch (result.kind) {
         case 'arm':
-          setConfirm(null);
           setArmed(result.armed);
           haptic('tap');
           playSound('slide');
           break;
         case 'commit':
           setArmed(null);
-          setConfirm(null);
           setLastOutbound(result.action);
           dispatch(result.action);
-          haptic('tap');
-          break;
-        case 'confirm-wrong':
-          setConfirm({
-            armed: result.armed,
-            knownKey: result.knownKey,
-            discardKey: result.discardKey,
-          });
           haptic('tap');
           break;
         case 'disarm':
@@ -199,7 +174,7 @@ export function TableInputProvider({ children }: { children: ReactNode }) {
   );
 
   const onCardTap = useCallback(
-    (ownerId: PlayerId, slotIndex: number, cardId: string, knownKey: CardKey | null) => {
+    (ownerId: PlayerId, slotIndex: number, cardId: string) => {
       if (!view) return;
       const result = routeCardTap({
         localPhase,
@@ -209,10 +184,8 @@ export function TableInputProvider({ children }: { children: ReactNode }) {
         cardId,
         cambeoCallerId: view.cambeoCallerId,
         armed,
-        knownKey,
         discardKey: view.discardTop?.key ?? null,
         discardId: view.discardTop?.id ?? null,
-        skipWrongFlipConfirm,
         powerMode,
       });
       if (result.kind === 'noop') {
@@ -222,54 +195,27 @@ export function TableInputProvider({ children }: { children: ReactNode }) {
       }
       applyResult(result);
     },
-    [view, localPhase, viewerId, armed, skipWrongFlipConfirm, powerMode, applyResult],
+    [view, localPhase, viewerId, armed, powerMode, applyResult],
   );
 
   const onBackgroundTap = useCallback(() => {
-    if (armed || confirm) disarm();
-  }, [armed, confirm, disarm]);
-
-  const confirmWrongFlip = useCallback(() => {
-    if (!confirm) return;
-    const action = commitFlipAction(viewerId, confirm.armed);
-    setLastOutbound(action);
-    setArmed(null);
-    setConfirm(null);
-    dispatch(action);
-  }, [confirm, dispatch, viewerId]);
+    if (armed) disarm();
+  }, [armed, disarm]);
 
   const value = useMemo<TableInputValue>(
     () => ({
       localPhase,
       armed,
-      confirm,
       penalty,
       raceFade,
       shake,
-      skipWrongFlipConfirm,
-      setSkipWrongFlipConfirm,
       onCardTap,
       onBackgroundTap,
       disarm,
-      confirmWrongFlip,
-      cancelConfirm: disarm,
       dismissPenalty: () => setPenalty(null),
       lastOutbound,
     }),
-    [
-      localPhase,
-      armed,
-      confirm,
-      penalty,
-      raceFade,
-      shake,
-      skipWrongFlipConfirm,
-      onCardTap,
-      onBackgroundTap,
-      disarm,
-      confirmWrongFlip,
-      lastOutbound,
-    ],
+    [localPhase, armed, penalty, raceFade, shake, onCardTap, onBackgroundTap, disarm, lastOutbound],
   );
 
   return <TableInputContext.Provider value={value}>{children}</TableInputContext.Provider>;

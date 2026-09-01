@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { knows } from '../index.js';
+import { viewFor } from '../index.js';
+import { HOUSE_RULES } from '@cambeo/shared';
 import {
   apply,
   hasEvent,
@@ -53,7 +54,7 @@ describe('deck', () => {
     expect(hasEvent(state, 'FLIP_SUCCESS')).toBe(true);
   });
 
-  it('reshuffle clears knowledge of the reshuffled cards', () => {
+  it('reshuffle does not leak buried discard identities into the view', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
@@ -64,18 +65,11 @@ describe('deck', () => {
       discard: [{ key: '5' }, { key: '6' }, { key: 'K_BLACK' }],
     });
     const buried = state.discard[0]!;
-    // Everyone knows discard contents that were face up historically — grant buried knowledge
-    state = {
-      ...state,
-      knowledge: {
-        ...state.knowledge,
-        [P1]: { ...state.knowledge[P1], [buried]: true },
-      },
-    };
-    expect(knows(state, P1, buried)).toBe(true);
     state = apply(state, { type: 'DRAW_DECK', playerId: P1 });
-    // Buried card was reshuffled — knowledge cleared
-    expect(knows(state, P1, buried)).toBe(false);
+    const view = viewFor(state, P1, HOUSE_RULES);
+    expect(view.drawnCard).not.toBeNull();
+    expect(view.players[P1]!.hand.find((s) => s.id === buried)).toBeUndefined();
+    expect(view.discardTop?.id).not.toBe(buried);
   });
 
   it('[spec] deck out with an empty discard, draw rejected, state unchanged', () => {

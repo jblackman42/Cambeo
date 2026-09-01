@@ -111,10 +111,6 @@ export function flipPenaltyMessage(flippedKey: CardKey, discardKey: CardKey): st
   return `No match. You flipped ${withArticle(rankSpokenName(flippedKey))} onto ${withArticle(rankSpokenName(discardKey))}. You take a penalty card.`;
 }
 
-export function flipConfirmMessage(knownKey: CardKey, discardKey: CardKey): string {
-  return `You know this is ${withArticle(rankSpokenName(knownKey))}. Discard shows ${withArticle(rankSpokenName(discardKey))}. A wrong flip costs a penalty card.`;
-}
-
 export function powerPromptLabel(powerId: string, stepKind: string): string {
   const map: Record<string, string> = {
     'PEEK_OWN:OWN_CARD': 'Peek one of your cards',

@@ -9,7 +9,7 @@ import type { Action } from './actions.js';
 import type { GameEvent } from './events.js';
 import type { GameState, Card, CardId, PlayerId } from './state.js';
 import { createRng, type Rng } from './rng.js';
-import { emptyKnowledge, grantKnowledge } from './knowledge.js';
+import { cardRevealedEvent } from './reveal.js';
 
 export function createGame(
   playerIds: PlayerId[],
@@ -36,7 +36,6 @@ export function createGame(
     cambeo: null,
     finalRoundRemaining: [],
     ackedPeek: [],
-    knowledge: emptyKnowledge(playerIds),
     overThreshold: [],
     result: null,
     lastEvents: [],
@@ -81,10 +80,9 @@ export function startGame(
     { type: 'PHASE_CHANGED', from: 'LOBBY', to: 'INITIAL_PEEK' },
   ];
 
-  let knowledgeState: GameState = {
+  const dealtState: GameState = {
     ...state,
     cards,
-    knowledge: emptyKnowledge(state.seating),
   };
 
   for (const playerId of state.seating) {
@@ -99,13 +97,22 @@ export function startGame(
     players[playerId] = { id: playerId, hand };
     events.push({ type: 'DEALT', playerId, cardIds: [...hand] });
 
-    const revealed = hand.slice(0, ruleSet.initialRevealCount);
-    knowledgeState = grantKnowledge(knowledgeState, playerId, revealed);
-    events.push({ type: 'INITIAL_PEEK_GRANTED', playerId, cardIds: [...revealed] });
+    const peekCount = Math.min(ruleSet.initialRevealCount, hand.length);
+    for (let slotIndex = 0; slotIndex < peekCount; slotIndex++) {
+      events.push(
+        cardRevealedEvent(dealtState, ruleSet, {
+          revealedToPlayerId: playerId,
+          ownerId: playerId,
+          slotIndex,
+          cardId: hand[slotIndex]!,
+          kind: 'INITIAL_PEEK',
+        }),
+      );
+    }
   }
 
   return {
-    ...knowledgeState,
+    ...dealtState,
     phase: 'INITIAL_PEEK',
     phaseBeforeGive: null,
     players,

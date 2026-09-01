@@ -88,27 +88,11 @@ export function finishGame(
   });
   events.push({ type: 'PHASE_CHANGED', from: 'SCORING', to: 'OVER' });
 
-  // Reveal all hands: grant all knowledge
-  const knowledge = { ...state.knowledge };
-  for (const playerId of state.seating) {
-    const all: Record<string, true> = { ...knowledge[playerId] };
-    for (const pid of state.seating) {
-      for (const cardId of state.players[pid]!.hand) {
-        all[cardId] = true;
-      }
-    }
-    for (const cardId of state.discard) {
-      all[cardId] = true;
-    }
-    knowledge[playerId] = all;
-  }
-
   return withRng(
     {
       ...state,
       phase: 'OVER',
       turn: null,
-      knowledge,
       result: { totals, winnerIds, callerBeaten },
     },
     rng,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HOUSE_RULES, type RuleSet } from '@cambeo/shared';
-import { knows } from '../index.js';
+import { viewFor } from '../index.js';
 import {
   apply,
   hasEvent,
@@ -31,7 +31,7 @@ function drawAndDiscardForPower(deckCard: { key: '6' | '8' | '10' | 'J' }) {
 }
 
 describe('powers', () => {
-  it('PEEK_OWN grants knowledge to the actor only', () => {
+  it('PEEK_OWN emits CARD_REVEALED to the actor only', () => {
     let state = drawAndDiscardForPower({ key: '6' });
     expect(state.pendingPower?.powerId).toBe('PEEK_OWN');
     const targetId = state.players[P1]!.hand[2]!;
@@ -40,12 +40,22 @@ describe('powers', () => {
       playerId: P1,
       target: { kind: 'CARD', playerId: P1, slotIndex: 2 },
     });
-    expect(knows(state, P1, targetId)).toBe(true);
-    expect(knows(state, P2, targetId)).toBe(false);
+    const v1 = viewFor(state, P1, HOUSE_RULES);
+    const v2 = viewFor(state, P2, HOUSE_RULES);
+    const r1 = v1.lastEvents.find((e) => e.type === 'CARD_REVEALED');
+    const r2 = v2.lastEvents.find((e) => e.type === 'CARD_REVEALED');
+    expect(r1?.type).toBe('CARD_REVEALED');
+    if (r1?.type === 'CARD_REVEALED') {
+      expect(r1.cardId).toBe(targetId);
+      expect(r1.key).toBeTruthy();
+      expect(r1.revealedToPlayerId).toBe(P1);
+    }
+    if (r2?.type === 'CARD_REVEALED') expect(r2.key).toBeUndefined();
+    expect(v1.players[P1]!.hand[2]!.known).toBe(false);
     expect(hasEvent(state, 'POWER_COMPLETED')).toBe(true);
   });
 
-  it('PEEK_OTHER grants knowledge to the actor only', () => {
+  it('PEEK_OTHER emits CARD_REVEALED to the actor only', () => {
     let state = drawAndDiscardForPower({ key: '8' });
     const targetId = state.players[P2]!.hand[1]!;
     state = apply(state, {
@@ -53,8 +63,16 @@ describe('powers', () => {
       playerId: P1,
       target: { kind: 'CARD', playerId: P2, slotIndex: 1 },
     });
-    expect(knows(state, P1, targetId)).toBe(true);
-    expect(knows(state, P3, targetId)).toBe(false);
+    const v1 = viewFor(state, P1, HOUSE_RULES);
+    const v3 = viewFor(state, P3, HOUSE_RULES);
+    const r1 = v1.lastEvents.find((e) => e.type === 'CARD_REVEALED');
+    const r3 = v3.lastEvents.find((e) => e.type === 'CARD_REVEALED');
+    expect(r1?.type).toBe('CARD_REVEALED');
+    if (r1?.type === 'CARD_REVEALED') {
+      expect(r1.cardId).toBe(targetId);
+      expect(r1.key).toBeTruthy();
+    }
+    if (r3?.type === 'CARD_REVEALED') expect(r3.key).toBeUndefined();
   });
 
   it('BLIND_SWAP grants the swapper nothing', () => {
@@ -71,18 +89,14 @@ describe('powers', () => {
       playerId: P1,
       target: { kind: 'CARD', playerId: P2, slotIndex: 0 },
     });
-    expect(knows(state, P1, aId)).toBe(false);
-    expect(knows(state, P1, bId)).toBe(false);
+    expect(state.lastEvents.some((e) => e.type === 'CARD_REVEALED')).toBe(false);
     expect(state.players[P1]!.hand[0]).toBe(bId);
     expect(state.players[P2]!.hand[0]).toBe(aId);
   });
 
-  it('blind swap destroys both owners slot knowledge', () => {
+  it('blind swap does not leave either card known in the view', () => {
     let state = drawAndDiscardForPower({ key: '10' });
     const aId = state.players[P1]!.hand[0]!;
-    const bId = state.players[P2]!.hand[0]!;
-    // P1 knows their first card from initial peek
-    expect(knows(state, P1, aId)).toBe(true);
     state = apply(state, {
       type: 'RESOLVE_POWER_TARGET',
       playerId: P1,
@@ -93,8 +107,10 @@ describe('powers', () => {
       playerId: P1,
       target: { kind: 'CARD', playerId: P2, slotIndex: 0 },
     });
-    expect(knows(state, P1, aId)).toBe(false);
-    expect(knows(state, P2, bId)).toBe(false);
+    const v1 = viewFor(state, P1, HOUSE_RULES);
+    const v2 = viewFor(state, P2, HOUSE_RULES);
+    expect(v1.players[P2]!.hand.find((s) => s.id === aId)?.known).toBe(false);
+    expect(v2.players[P2]!.hand.find((s) => s.id === aId)?.known).toBe(false);
   });
 
   it('LOOK_THEN_BLIND_SWAP reveals then swaps', () => {
@@ -105,7 +121,7 @@ describe('powers', () => {
       playerId: P1,
       target: { kind: 'CARD', playerId: P2, slotIndex: 0 },
     });
-    expect(knows(state, P1, peekId)).toBe(true);
+    expect(hasEvent(state, 'CARD_REVEALED')).toBe(true);
     expect(state.phase).toBe('POWER_TARGETING');
     const aId = state.players[P1]!.hand[1]!;
     const bId = state.players[P3]!.hand[1]!;
@@ -122,13 +138,8 @@ describe('powers', () => {
     expect(hasEvent(state, 'POWER_SWAP')).toBe(true);
     expect(state.players[P1]!.hand[1]).toBe(bId);
     expect(state.players[P3]!.hand[1]).toBe(aId);
-    // Peek knowledge of peekId was cleared by the subsequent swap of different cards —
-    // peekId itself wasn't swapped, but LOOK_THEN_BLIND_SWAP: reveal then swap any two.
-    // Knowledge of peeked card persists until THAT card is swapped. peekId wasn't in the swap.
-    // After blind swap of other cards, peekId knowledge: clearKnowledge only clears swapped cards.
-    // So P1 should still know peekId... unless we cleared all. We only clear swapped.
-    // But wait - initial reveal of peek granted knowledge, then swap cleared aId and bId only.
-    expect(knows(state, P1, peekId)).toBe(true);
+    const later = viewFor(state, P1, HOUSE_RULES);
+    expect(later.players[P2]!.hand.find((s) => s.id === peekId)?.known).toBe(false);
   });
 
   it('LOOK_THEN_BLIND_SWAP can swap the card that was looked at', () => {
@@ -140,7 +151,7 @@ describe('powers', () => {
       playerId: P1,
       target: { kind: 'CARD', playerId: P2, slotIndex: 0 },
     });
-    expect(knows(state, P1, peekId)).toBe(true);
+    expect(hasEvent(state, 'CARD_REVEALED')).toBe(true);
     state = apply(state, {
       type: 'RESOLVE_POWER_TARGET',
       playerId: P1,
@@ -338,7 +349,7 @@ describe('powers', () => {
     expect(state.players[P1]!.hand).toEqual(handBefore);
   });
 
-  it('SHUFFLE_TARGET_HAND permutes from the rng and destroys slot knowledge', () => {
+  it('SHUFFLE_TARGET_HAND permutes from the rng', () => {
     const rules: RuleSet = {
       ...HOUSE_RULES,
       powers: { ...HOUSE_RULES.powers, '6': 'SHUFFLE_TARGET_HAND' },
@@ -355,8 +366,6 @@ describe('powers', () => {
       seed: 'shuffle-seed',
     });
     const before = [...state.players[P2]!.hand];
-    const knownBefore = before[0]!;
-    expect(knows(state, P2, knownBefore)).toBe(true);
     state = apply(state, { type: 'DRAW_DECK', playerId: P1 }, rules);
     state = apply(state, { type: 'DISCARD_DRAWN', playerId: P1 }, rules);
     state = apply(
@@ -372,10 +381,8 @@ describe('powers', () => {
     const after = state.players[P2]!.hand;
     expect(after).toHaveLength(before.length);
     expect([...after].sort()).toEqual([...before].sort());
-    // Knowledge of those cards cleared
-    for (const id of before) {
-      expect(knows(state, P2, id)).toBe(false);
-    }
+    const view = viewFor(state, P2, rules);
+    expect(view.players[P2]!.hand.every((s) => !s.known)).toBe(true);
   });
 
   it('powers are read from the RuleSet, not the rank', () => {

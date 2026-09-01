@@ -3,7 +3,6 @@ import type { Action } from './actions.js';
 import type { GameEvent } from './events.js';
 import type { GameState } from './state.js';
 import type { Rng } from './rng.js';
-import { grantKnowledge, grantKnowledgeToAll } from './knowledge.js';
 import { getCard, isCambeoCallerProtected, reject, withRng } from './setup.js';
 import { addCardToHand, drawFromDeck, removeCardFromHand } from './turn.js';
 import { specialCardHooks } from './extensions/heavenHell.js';
@@ -137,10 +136,6 @@ function resolveSuccessfulFlip(
 
   assertHellDiscardInvariant(next, ruleSet);
 
-  for (const pid of state.seating) {
-    next = grantKnowledge(next, pid, [flippedCardId]);
-  }
-
   const isOwnCard = action.target.playerId === action.playerId;
   if (isOwnCard) {
     return withRng(next, rng, events);
@@ -221,8 +216,7 @@ function resolveFailedFlip(
     },
   ];
 
-  // Incorrect flip reveals the card to everyone
-  let next = grantKnowledgeToAll(state, [flippedCardId]);
+  let next = state;
 
   const drawn = drawFromDeck(next, rng);
   events.push(...drawn.events);

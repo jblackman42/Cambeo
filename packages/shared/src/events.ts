@@ -7,7 +7,6 @@ export type GameEvent =
   | { type: 'ACTION_REJECTED'; playerId: PlayerId; actionType: string; reason: string }
   | { type: 'GAME_STARTED'; seating: PlayerId[] }
   | { type: 'DEALT'; playerId: PlayerId; cardIds: CardId[] }
-  | { type: 'INITIAL_PEEK_GRANTED'; playerId: PlayerId; cardIds: CardId[] }
   | { type: 'PEEK_ACKED'; playerId: PlayerId }
   | { type: 'TURN_STARTED'; playerId: PlayerId }
   | { type: 'TURN_PASSED'; playerId: PlayerId }
@@ -23,13 +22,18 @@ export type GameEvent =
   | { type: 'CARD_KEPT'; playerId: PlayerId; cardId: CardId }
   | { type: 'POWER_STARTED'; playerId: PlayerId; powerId: PowerId; sourceCardId: CardId }
   | {
-      type: 'POWER_REVEAL';
-      playerId: PlayerId;
-      targetPlayerId: PlayerId;
-      slotIndex: number;
+      type: 'CARD_REVEALED';
       cardId: CardId;
+      ownerId: PlayerId;
+      slotIndex: number;
+      revealedToPlayerId: PlayerId;
+      kind: 'INITIAL_PEEK' | 'POWER';
+      durationMs: number;
+      /** Unix ms. Stamped by the room server; absent on raw engine events. */
+      expiresAt?: number;
       key?: CardKey;
       suit?: Suit;
+      value?: number;
     }
   | {
       type: 'POWER_SWAP';
@@ -98,6 +102,5 @@ export type GameEvent =
       totals: Record<PlayerId, number>;
     }
   | { type: 'LOSS_THRESHOLD_EXCEEDED'; playerId: PlayerId; handSize: number }
-  | { type: 'KNOWLEDGE_CLEARED'; cardIds: CardId[] }
   | { type: 'PHASE_CHANGED'; from: string; to: string }
   | { type: 'POWER_TARGET_ACCEPTED'; playerId: PlayerId; target: PowerTarget };

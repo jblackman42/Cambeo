@@ -1,4 +1,4 @@
-import { matchKeyFor, type RedactedGameView } from '@cambeo/shared';
+import { type RedactedGameView } from '@cambeo/shared';
 import { describe, expect, it } from 'vitest';
 import {
   ARM_TIMEOUT_MS,
@@ -29,10 +29,8 @@ function tap(overrides: Partial<CardTapInput> = {}): CardTapInput {
     cardId: 'c1',
     cambeoCallerId: null,
     armed: null,
-    knownKey: null,
     discardKey: '7',
     discardId: 'd1',
-    skipWrongFlipConfirm: false,
     ...overrides,
   };
 }
@@ -190,52 +188,6 @@ describe('routeCardTap', () => {
   });
 });
 
-describe('confirmation guard', () => {
-  it('known non-matching card raises confirmation and does not send on second tap', () => {
-    const result = routeCardTap(
-      tap({
-        armed: armed(),
-        knownKey: 'Q_RED',
-        discardKey: '7',
-      }),
-    );
-    expect(result.kind).toBe('confirm-wrong');
-    if (result.kind === 'confirm-wrong') {
-      expect(result.knownKey).toBe('Q_RED');
-      expect(result.discardKey).toBe('7');
-    }
-  });
-
-  it('unknown card sends on second tap with no confirmation', () => {
-    const result = routeCardTap(tap({ armed: armed(), knownKey: null }));
-    expect(result.kind).toBe('commit');
-  });
-
-  it('known matching card sends on second tap with no confirmation', () => {
-    const result = routeCardTap(
-      tap({
-        armed: armed({ discardKey: 'Q_BLACK' }),
-        knownKey: 'Q_RED',
-        discardKey: 'Q_BLACK',
-      }),
-    );
-    expect(result.kind).toBe('commit');
-    expect(matchKeyFor('Q_RED')).toBe(matchKeyFor('Q_BLACK'));
-  });
-
-  it('skipWrongFlipConfirm commits a known mismatch', () => {
-    const result = routeCardTap(
-      tap({
-        armed: armed(),
-        knownKey: 'K_RED',
-        discardKey: '7',
-        skipWrongFlipConfirm: true,
-      }),
-    );
-    expect(result.kind).toBe('commit');
-  });
-});
-
 describe('shouldDisarmArmed', () => {
   const ctx = {
     discardId: 'd1',
@@ -348,6 +300,25 @@ describe('powerActionCopy', () => {
 });
 
 describe('powerStepNeedsSkip', () => {
+  it('does not throw after a Jack peek when selections are missing from the view', () => {
+    const v = view({
+      phase: 'POWER_TARGETING',
+      pendingPower: {
+        playerId: VIEWER,
+        powerId: 'LOOK_THEN_BLIND_SWAP',
+        stepIndex: 1,
+      },
+      players: {
+        [VIEWER]: { id: VIEWER, hand: [{ id: 'c1', known: false }], cardCount: 1 },
+        [OPP]: { id: OPP, hand: [{ id: 'c2', known: false }], cardCount: 1 },
+        p3: { id: 'p3', hand: [{ id: 'c3', known: false }], cardCount: 1 },
+      },
+    });
+    expect(() => powerStepNeedsSkip(v, VIEWER)).not.toThrow();
+    expect(() => powerActionCopy('LOOK_THEN_BLIND_SWAP', 1)).not.toThrow();
+    expect(powerStepNeedsSkip(v, VIEWER)).toBe(false);
+  });
+
   it('is true when Jack look has no opponent cards except the cambeo caller', () => {
     const v = view({
       phase: 'POWER_TARGETING',

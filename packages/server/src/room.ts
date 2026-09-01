@@ -1,14 +1,5 @@
-import {
-  HOUSE_RULES,
-  tryParseClientMessage,
-  type Action,
-  type ClientMessage,
-  type PlayerId,
-  type RoomErrorCode,
-  type RoomView,
-  type RuleSet,
-  type ServerMessage,
-} from '@cambeo/shared';
+import type { Action, ClientMessage, PlayerId, RedactedGameView, RoomErrorCode, RoomView, RuleSet, ServerMessage } from '@cambeo/shared';
+import { HOUSE_RULES, tryParseClientMessage, type GameEvent } from '@cambeo/shared';
 import { createGame, createRng, reduce, viewFor, type GameState } from '@cambeo/engine';
 import { disconnectAction, nextTimeoutTarget } from './timeout.js';
 
@@ -233,7 +224,7 @@ export class RoomController {
       this.refreshDeadline();
       const outbound: Outbound[] = [
         this.welcome(connId, existing.playerId),
-        { connId, message: { type: 'snapshot', room: this.roomView(existing.playerId) } },
+        { connId, message: { type: 'snapshot', room: this.roomView(existing.playerId, 'snapshot') } },
         ...this.fanoutRoom(),
       ];
       return this.result(outbound, true);
@@ -269,7 +260,7 @@ export class RoomController {
     this.refreshDeadline();
     const outbound: Outbound[] = [
       this.welcome(connId, playerId),
-      { connId, message: { type: 'snapshot', room: this.roomView(playerId) } },
+      { connId, message: { type: 'snapshot', room: this.roomView(playerId, 'snapshot') } },
       ...this.fanoutRoom(),
     ];
     return this.result(outbound, true);
@@ -440,9 +431,9 @@ export class RoomController {
     this.seq += 1;
   }
 
-  private roomView(viewerId: PlayerId): RoomView {
+  private roomView(viewerId: PlayerId, mode: 'live' | 'snapshot' = 'live'): RoomView {
     const you = this.players.find((p) => p.playerId === viewerId);
-    const view = this.game ? viewFor(this.game, viewerId, this.ruleSet) : null;
+    const view = this.game ? this.playerView(viewerId, mode) : null;
     return {
       roomCode: this.roomCode,
       hostId: this.hostId,
@@ -459,6 +450,21 @@ export class RoomController {
       game: view,
       lastEvents: view?.lastEvents ?? [],
     };
+  }
+
+  private playerView(viewerId: PlayerId, mode: 'live' | 'snapshot' | 'deliver'): RedactedGameView {
+    const now = this.deps.now();
+    const view = viewFor(this.game!, viewerId, this.ruleSet);
+    if (mode === 'deliver') {
+      return { ...view, lastEvents: stampRevealExpiry(view.lastEvents, now) };
+    }
+    if (mode === 'snapshot') {
+      return {
+        ...view,
+        lastEvents: view.lastEvents.filter((event) => event.type !== 'CARD_REVEALED'),
+      };
+    }
+    return { ...view, lastEvents: stripRevealIdentity(view.lastEvents) };
   }
 
   private welcome(connId: string, playerId: PlayerId): Outbound {
@@ -491,7 +497,7 @@ export class RoomController {
     const outbound: Outbound[] = [];
     for (const [connId, binding] of this.conns) {
       if (!binding.playerId) continue;
-      const view = viewFor(this.game, binding.playerId, this.ruleSet);
+      const view = this.playerView(binding.playerId, 'deliver');
       outbound.push({
         connId,
         message: {
@@ -516,4 +522,26 @@ export class RoomController {
   private result(outbound: Outbound[], persist: boolean): HandleResult {
     return { outbound, alarmAt: this.turnDeadline?.at ?? null, persist };
   }
+}
+
+function stampRevealExpiry(events: GameEvent[], now: number): GameEvent[] {
+  return events.map((event) =>
+    event.type === 'CARD_REVEALED' ? { ...event, expiresAt: now + event.durationMs } : event,
+  );
+}
+
+function stripRevealIdentity(events: GameEvent[]): GameEvent[] {
+  return events.map((event) => {
+    if (event.type !== 'CARD_REVEALED') return event;
+    return {
+      type: 'CARD_REVEALED',
+      cardId: event.cardId,
+      ownerId: event.ownerId,
+      slotIndex: event.slotIndex,
+      revealedToPlayerId: event.revealedToPlayerId,
+      kind: event.kind,
+      durationMs: event.durationMs,
+      ...(event.expiresAt !== undefined ? { expiresAt: event.expiresAt } : {}),
+    };
+  });
 }

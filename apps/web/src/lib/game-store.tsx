@@ -3,8 +3,15 @@
 import type { Action, PlayerId } from '@cambeo/engine';
 import { createGame, createRng, reduce, viewFor } from '@cambeo/engine';
 import { HOUSE_RULES, cloneRuleSet, type RedactedGameView, type RuleSet } from '@cambeo/shared';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { PlayProvider, deriveMode, type InteractionMode, type PlayStore } from '@/lib/play-context';
+import {
+  dismissInitialPeeks as dropInitialPeeks,
+  expireReveals,
+  ingestReveals,
+  nextExpiryAt,
+  type ActiveReveal,
+} from '@/lib/reveals';
 
 function makeIds(names: string[]): { ids: PlayerId[]; nameMap: Record<PlayerId, string> } {
   const ids = names.map((_, i) => `p${i + 1}`);
@@ -29,6 +36,31 @@ export function GameProvider({
   const [lastReject, setLastReject] = useState<string | null>(null);
   const [mode, setMode] = useState<InteractionMode>({ kind: 'flip' });
   const [lobbyNames, setLobbyNames] = useState<string[]>([]);
+  const [reveals, setReveals] = useState<ActiveReveal[]>([]);
+
+  useEffect(() => {
+    const at = nextExpiryAt(reveals);
+    if (at == null) return undefined;
+    const wait = Math.max(0, at - Date.now());
+    const t = window.setTimeout(() => setReveals((rows) => expireReveals(rows, Date.now())), wait);
+    return () => window.clearTimeout(t);
+  }, [reveals]);
+
+  useEffect(() => {
+    if (!state) {
+      setReveals([]);
+      return;
+    }
+    setReveals((rows) => ingestReveals(rows, state.lastEvents, Date.now()));
+  }, [state]);
+
+  useEffect(() => {
+    if (!state) {
+      setReveals([]);
+      return;
+    }
+    setReveals((rows) => ingestReveals(rows, state.lastEvents, Date.now()));
+  }, [state]);
 
   const resetLobby = useCallback(
     (playerNames: string[]) => {
@@ -70,6 +102,10 @@ export function GameProvider({
     [ruleSet],
   );
 
+  const dismissInitialPeeks = useCallback(() => {
+    setReveals((rows) => dropInitialPeeks(rows, viewerId));
+  }, [viewerId]);
+
   const applyRules = useCallback((next: RuleSet) => {
     setRuleSet(cloneRuleSet(next));
   }, []);
@@ -107,6 +143,8 @@ export function GameProvider({
     resetLobby,
     wsStatus: 'idle',
     lastError: null,
+    reveals,
+    dismissInitialPeeks,
   };
 
   return <PlayProvider value={value}>{children}</PlayProvider>;

@@ -37,7 +37,9 @@ Room codes are 5 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 | `error` | Protocol / room errors (`ROOM_FULL`, `GAME_IN_PROGRESS`, `NOT_HOST`, `INVALID_RULES`, …) |
 | `pong` | Heartbeat reply |
 
-`RoomView.ruleSet` is the room’s current config (lobby and in-game). Every `state` / `snapshot.game` is redacted for that player. Face-down identities the viewer does not know are never sent (`known: false` slots have no `key`). `POWER_REVEAL` identity is stripped for non-peekers. Drawn-card identity is only on the drawer’s view.
+`RoomView.ruleSet` is the room’s current config (lobby and in-game). Every `state` / `snapshot.game` is redacted for that player. Hand slots never include face identity during play (`known: false`, no `key`). Drawn-card identity is only on the drawer’s view. Discard top is public. Final scoring reveals all hands.
+
+A `CARD_REVEALED` identity is delivered **once**, on the `state` message after the reduce that created it, and only to the addressed player (with `expiresAt` stamped by the server). Other players get the same event with no `key`. Snapshots and reconnects never reissue a reveal, even if it has not yet expired.
 
 ## Flip race
 

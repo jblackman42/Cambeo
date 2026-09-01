@@ -68,8 +68,6 @@ export interface GameState {
   cambeo: CambeoState | null;
   finalRoundRemaining: PlayerId[];
   ackedPeek: PlayerId[];
-  /** Per-player knowledge of card identities. Invariant 2. */
-  knowledge: Record<PlayerId, Record<CardId, true>>;
   /** Players who exceeded lossThreshold. Flag only — see TODO(spec 11.2). */
   overThreshold: PlayerId[];
   result: GameResult | null;

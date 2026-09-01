@@ -24,8 +24,8 @@ function describe(event: GameEvent, names: Record<string, string>, discardKey?: 
       return `${n(event.playerId)} kept the drawn card`;
     case 'POWER_STARTED':
       return `${n(event.playerId)} power: ${event.powerId}`;
-    case 'POWER_REVEAL':
-      return `${n(event.playerId)} peeked a card`;
+    case 'CARD_REVEALED':
+      return `${n(event.revealedToPlayerId)} peeked a card`;
     case 'POWER_SWAP':
       return `${n(event.playerId)} swapped two cards`;
     case 'POWER_SHUFFLE':
@@ -66,7 +66,7 @@ export function EventLog() {
   const { view, names } = useGame();
   if (!view) return null;
 
-  const events = view.lastEvents.filter((e) => e.type !== 'PHASE_CHANGED');
+  const events = (view.lastEvents ?? []).filter((e) => e.type !== 'PHASE_CHANGED');
 
   return (
     <div className="panel">

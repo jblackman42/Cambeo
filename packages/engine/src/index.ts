@@ -17,8 +17,7 @@ export type {
 export { createRng, type Rng } from './rng.js';
 export { createGame } from './setup.js';
 export { reduce, reduceWithSeed } from './reduce.js';
-export { viewFor, redactEvents } from './view.js';
-export { knows, grantKnowledge, clearKnowledgeForCards } from './knowledge.js';
+export { viewFor, redactEvents, identitiesInView, assertViewIdentityInvariant } from './view.js';
 export { computeScores, finishGame } from './scoring.js';
 export {
   canPlaceOnDiscard,

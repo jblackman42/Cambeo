@@ -78,6 +78,8 @@ Note that card keys are split by color for **value and power** purposes only. Fl
 **Game**
 - Starting hand size: 4 to 6.
 - Cards revealed to owner at start: 0 to hand size, default 2.
+- `initialPeekDurationMs`: how long the starting peek stays face up, default 8000. Tapping Got it hides them immediately.
+- `powerRevealDurationMs`: how long a power peek stays face up, default 4000.
 - Loss threshold (card count above which a player loses), default 6.
 - `heavenDiscardableAfterCambeo`: boolean, default `false`. When false, heaven cannot be discarded by any means during the final round after cambeo is called.
 - `hellDiscardOnlyOntoHeaven`: boolean, default `true`. When true, hell may only reach the discard pile via a correct flip onto heaven.
@@ -157,12 +159,26 @@ Flipping is legal in every phase except `SCORING` and `OVER`, which is the main 
 **Server-authoritative, one room object per game.** Suggested: Cloudflare Durable Objects or PartyKit. One object holds the state in memory, owns the websocket connections, and runs the engine. No database needed for v1; a room dies when the game ends.
 
 **Redaction is per recipient.** The server computes a distinct view for every connected client on every state change:
-- Your own cards: identity only for slots you currently know.
-- Opponents' cards: position and count, never identity, unless a power revealed one to you specifically.
+- Hand slots: position and count only. Never identity, including your own cards.
 - Discard pile top: public.
 - Deck: count only.
+- Drawn card: identity only for the player currently holding it, and only until they discard, replace, or keep it.
 
-The engine tracks a per-player "knowledge set" of card ids so that a peeked card stays known to that player until it is swapped or discarded, and so blind swaps correctly destroy knowledge. A card given blind after a flip is unknown to its new owner.
+A reveal is a time-boxed server-issued event, not a property of game state. The engine keeps no per-player knowledge set. Knowledge lives in the player's head.
+
+The server emits a `CARD_REVEALED` event to exactly one player:
+
+`{ cardId, ownerId, slotIndex, revealedToPlayerId, kind, durationMs, expiresAt, key, suit, value }`
+
+Everyone else receives the same event with `key` / `suit` / `value` omitted (a lift notification). The client renders the face until `expiresAt`, then deletes the identity from client state. The server never sends that identity to that player again — not on reconnect, not in a snapshot, not in a diff.
+
+Duration is server-authoritative (`expiresAt`). Configurable on the `RuleSet`: `initialPeekDurationMs` (default 8000) and `powerRevealDurationMs` (default 4000). The client also self-expires on its own clock as a backstop. If a player disconnects mid-reveal, the reveal is lost; it is not reissued.
+
+What counts as a reveal (all expire): initial peek, `PEEK_OWN`, `PEEK_OTHER`, the look step of `LOOK_THEN_BLIND_SWAP`, both cards of `LOOK_THEN_OPTIONAL_SWAP`, and any future power that shows a face.
+
+What is not a reveal: the card you just drew while deciding, the discard top, and the final scoring reveal.
+
+Engine invariant: no client view ever holds an identity outside an unexpired `CARD_REVEALED` addressed to it, its held drawn card, the discard top, or final scoring.
 
 **Flip race resolution:** flips arrive as messages, are ordered by server arrival, and the first valid attempt against a given discard wins. All later attempts against that same discard are rejected. Start there. If latency turns out to be unfair, add a 250ms collection window resolved by client timestamp with a clock offset measured at join.
 
@@ -218,7 +234,7 @@ While the local player has an open action of their own, taps are routed exclusiv
 
 Every no-op still gives feedback (shake or dim pulse).
 
-If the player arms a card whose identity they know, and it does not match the discard, the commit tap raises a confirmation naming both cards and the penalty. Unknown cards and known matches commit on the second tap. The confirmation may be skipped for the rest of the game via a checkbox.
+The remaining protections are arm-then-commit, suppressed flips during your own pending action, and the armed-state bar naming the rank on the discard pile. There is no confirmation guard based on a remembered card identity.
 
 ### 6.3 Penalty explanation
 

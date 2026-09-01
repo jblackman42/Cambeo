@@ -4,13 +4,13 @@ import {
   type RedactedGameView,
   type SlotView,
   type RuleSet,
+  type CardId,
 } from '@cambeo/shared';
 import type { GameState, PlayerId } from './state.js';
 import { getCard } from './setup.js';
-import { knows } from './knowledge.js';
 
-function slotView(state: GameState, viewerId: PlayerId, cardId: string, ruleSet: RuleSet): SlotView {
-  if (knows(state, viewerId, cardId) || state.phase === 'SCORING' || state.phase === 'OVER') {
+function slotView(state: GameState, cardId: string, ruleSet: RuleSet): SlotView {
+  if (state.phase === 'SCORING' || state.phase === 'OVER') {
     const card = getCard(state, cardId);
     return {
       id: cardId,
@@ -32,19 +32,22 @@ export function redactEvents(
   viewerId: PlayerId,
   events: GameEvent[],
 ): GameEvent[] {
-  return events.map((event) => redactEvent(state, viewerId, event));
+  return events.map((event) => redactEvent(viewerId, event));
 }
 
-function redactEvent(state: GameState, viewerId: PlayerId, event: GameEvent): GameEvent {
+function redactEvent(viewerId: PlayerId, event: GameEvent): GameEvent {
   switch (event.type) {
-    case 'POWER_REVEAL': {
-      if (knows(state, viewerId, event.cardId)) return event;
+    case 'CARD_REVEALED': {
+      if (event.revealedToPlayerId === viewerId) return event;
       return {
-        type: 'POWER_REVEAL',
-        playerId: event.playerId,
-        targetPlayerId: event.targetPlayerId,
-        slotIndex: event.slotIndex,
+        type: 'CARD_REVEALED',
         cardId: event.cardId,
+        ownerId: event.ownerId,
+        slotIndex: event.slotIndex,
+        revealedToPlayerId: event.revealedToPlayerId,
+        kind: event.kind,
+        durationMs: event.durationMs,
+        ...(event.expiresAt !== undefined ? { expiresAt: event.expiresAt } : {}),
       };
     }
     case 'CARD_DRAWN': {
@@ -60,6 +63,50 @@ function redactEvent(state: GameState, viewerId: PlayerId, event: GameEvent): Ga
   }
 }
 
+/** Identities a client is allowed to hold from this view (engine invariant). */
+export function identitiesInView(view: RedactedGameView): Set<CardId> {
+  const ids = new Set<CardId>();
+  if (view.discardTop) ids.add(view.discardTop.id);
+  if (view.drawnCard) ids.add(view.drawnCard.id);
+  if (view.phase === 'SCORING' || view.phase === 'OVER') {
+    for (const player of Object.values(view.players)) {
+      for (const slot of player.hand) {
+        if (slot.known) ids.add(slot.id);
+      }
+    }
+  }
+  for (const event of view.lastEvents) {
+    if (
+      event.type === 'CARD_REVEALED' &&
+      event.revealedToPlayerId === view.viewerId &&
+      event.key !== undefined
+    ) {
+      ids.add(event.cardId);
+    }
+  }
+  return ids;
+}
+
+export function assertViewIdentityInvariant(view: RedactedGameView): void {
+  for (const player of Object.values(view.players)) {
+    for (const slot of player.hand) {
+      if (slot.known && view.phase !== 'SCORING' && view.phase !== 'OVER') {
+        throw new Error(`INVARIANT: slot ${slot.id} is known outside scoring`);
+      }
+      if (!slot.known && 'key' in slot && (slot as { key?: string }).key) {
+        throw new Error(`INVARIANT: hidden slot ${slot.id} leaked a key`);
+      }
+    }
+  }
+  for (const event of view.lastEvents) {
+    if (event.type === 'CARD_REVEALED' && event.key !== undefined) {
+      if (event.revealedToPlayerId !== view.viewerId) {
+        throw new Error('INVARIANT: CARD_REVEALED identity leaked to another player');
+      }
+    }
+  }
+}
+
 export function viewFor(
   state: GameState,
   viewerId: PlayerId,
@@ -67,9 +114,7 @@ export function viewFor(
 ): RedactedGameView {
   const players: RedactedGameView['players'] = {};
   for (const playerId of state.seating) {
-    const hand = state.players[playerId]!.hand.map((cardId) =>
-      slotView(state, viewerId, cardId, ruleSet),
-    );
+    const hand = state.players[playerId]!.hand.map((cardId) => slotView(state, cardId, ruleSet));
     players[playerId] = {
       id: playerId,
       hand,
@@ -123,7 +168,7 @@ export function viewFor(
           playerId: state.pendingPower.playerId,
           powerId: state.pendingPower.powerId,
           stepIndex: state.pendingPower.stepIndex,
-          selections: [...state.pendingPower.selections],
+          selections: [...(state.pendingPower.selections ?? [])],
         }
       : null,
     pendingGive: state.pendingGive

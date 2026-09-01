@@ -4,22 +4,12 @@ import { POWER_DEFINITIONS } from '@cambeo/shared';
 import { useGame } from '@/lib/play-context';
 import { powerActionCopy, isRaceLossReason, powerStepNeedsSkip } from '@/lib/input-routing';
 import { useTableInput } from '@/lib/table-input';
-import { flipConfirmMessage, rankSpokenName } from '@/lib/format';
+import { rankSpokenName } from '@/lib/format';
 import { useEffect, useRef } from 'react';
 
 export function PromptBar() {
-  const { view, viewerId, names, lastReject, dispatch, playMode } = useGame();
-  const {
-    localPhase,
-    armed,
-    confirm,
-    penalty,
-    skipWrongFlipConfirm,
-    setSkipWrongFlipConfirm,
-    disarm,
-    confirmWrongFlip,
-    dismissPenalty,
-  } = useTableInput();
+  const { view, viewerId, names, lastReject, dispatch, playMode, dismissInitialPeeks } = useGame();
+  const { localPhase, armed, penalty, disarm, dismissPenalty } = useTableInput();
 
   const pending = view?.pendingPower;
   const powerDef = pending ? POWER_DEFINITIONS[pending.powerId] : null;
@@ -52,37 +42,11 @@ export function PromptBar() {
           {penalty}
         </button>
       )}
-      {confirm && (
-        <div className="flip-confirm">
-          <p className="prompt-title">This flip will miss</p>
-          <p className="prompt-hint">{flipConfirmMessage(confirm.knownKey, confirm.discardKey)}</p>
-          <label className="field-check">
-            <input
-              type="checkbox"
-              checked={skipWrongFlipConfirm}
-              onChange={(e) => setSkipWrongFlipConfirm(e.target.checked)}
-            />
-            Don&apos;t ask again this game
-          </label>
-          <div className="btn-row">
-            <button type="button" className="btn btn-ghost" onClick={disarm}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn-danger" onClick={confirmWrongFlip}>
-              Flip anyway
-            </button>
-          </div>
-        </div>
-      )}
     </>
   );
 
   if (view.phase === 'OVER' && view.result) {
     return null;
-  }
-
-  if (confirm) {
-    return <div className="prompt-bar">{extras}</div>;
   }
 
   if (armed) {
@@ -122,9 +86,12 @@ export function PromptBar() {
             type="button"
             className="btn btn-primary"
             disabled={acked}
-            onClick={() => dispatch({ type: 'ACK_PEEK', playerId: viewerId })}
+            onClick={() => {
+              dismissInitialPeeks();
+              dispatch({ type: 'ACK_PEEK', playerId: viewerId });
+            }}
           >
-            {acked ? 'Ready' : "I've memorized them"}
+            {acked ? 'Ready' : 'Got it'}
           </button>
         </div>
       </div>

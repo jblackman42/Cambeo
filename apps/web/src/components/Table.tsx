@@ -15,71 +15,67 @@ import {
   powerModeFromView,
 } from '@/lib/input-routing';
 import { rankSpokenName } from '@/lib/format';
-import type { PlayerId, PublicCardView, RedactedGameView, SlotView } from '@cambeo/shared';
+import type { PlayerId, PublicCardView, SlotView } from '@cambeo/shared';
 import { useEffect, useRef, useState } from 'react';
+import { REVEAL_WARNING_MS, type ActiveReveal } from '@/lib/reveals';
 
-const REVEAL_HOLD_MS = 2500;
-
-function RevealLift({
-  view,
-  viewerId,
-}: {
-  view: RedactedGameView;
-  viewerId: PlayerId;
-}) {
-  const [reveal, setReveal] = useState<PublicCardView | null>(null);
-  const processed = useRef<string | null>(null);
+function CountdownRing({ reveal }: { reveal: ActiveReveal }) {
+  const [warning, setWarning] = useState(false);
 
   useEffect(() => {
-    const fingerprint = `${viewerId}:${view.lastEvents
-      .map((e) => `${e.type}${'cardId' in e ? `:${e.cardId}` : ''}`)
-      .join(',')}`;
-    if (processed.current === fingerprint) return;
-    processed.current = fingerprint;
-    const ev = view.lastEvents.find(
-      (e) => e.type === 'POWER_REVEAL' && e.playerId === viewerId && e.key && e.suit,
-    );
-    if (!ev || ev.type !== 'POWER_REVEAL' || !ev.key || !ev.suit) return;
-    setReveal({
-      id: ev.cardId,
-      key: ev.key,
-      suit: ev.suit,
-      value: view.ruleSet.values[ev.key] ?? 0,
-    });
-  }, [view, viewerId]);
-
-  useEffect(() => {
-    if (!reveal) return;
-    const t = window.setTimeout(() => setReveal(null), REVEAL_HOLD_MS);
+    const remain = reveal.expiresAt - Date.now();
+    const untilWarn = remain - REVEAL_WARNING_MS;
+    if (untilWarn <= 0) {
+      setWarning(true);
+      return undefined;
+    }
+    setWarning(false);
+    const t = window.setTimeout(() => setWarning(true), untilWarn);
     return () => window.clearTimeout(t);
-  }, [reveal]);
+  }, [reveal.expiresAt]);
 
-  useEffect(() => {
-    if (!reveal) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setReveal(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [reveal]);
-
-  if (!reveal) return null;
+  const remain = Math.max(0, reveal.expiresAt - Date.now());
+  const elapsed = Math.max(0, reveal.durationMs - remain);
+  const from = reveal.durationMs > 0 ? Math.min(1, elapsed / reveal.durationMs) : 0;
 
   return (
-    <button
-      type="button"
-      className="reveal-overlay"
-      onClick={() => setReveal(null)}
-      aria-label="Dismiss revealed card"
+    <svg
+      className="reveal-countdown"
+      data-warning={warning ? 'true' : 'false'}
+      viewBox="0 0 200 292"
+      aria-hidden
+      style={{
+        ['--reveal-ms' as string]: `${remain}ms`,
+        ['--reveal-from' as string]: String(from),
+      }}
     >
-      <span className="reveal-stage">
-        <svg className="reveal-countdown" viewBox="0 0 200 292" aria-hidden>
-          <rect x="4" y="4" width="192" height="284" rx="14" pathLength="1" />
-        </svg>
-        <CardFace face={reveal} asButton={false} />
-      </span>
-      <span className="reveal-hint">Tap to close</span>
-    </button>
+      <rect x="8" y="8" width="184" height="276" rx="16" pathLength="1" />
+    </svg>
+  );
+}
+
+function RevealLift({ viewerId }: { viewerId: PlayerId }) {
+  const { reveals } = useGame();
+  const lifted = reveals.filter((row) => row.kind === 'POWER');
+  if (lifted.length === 0) return null;
+
+  return (
+    <div className="reveal-overlay" role="status" aria-live="polite">
+      <div className="reveal-lift-row">
+        {lifted.map((row) => {
+          const mine = row.revealedToPlayerId === viewerId && row.key && row.suit;
+          const face: PublicCardView | undefined = mine
+            ? { id: row.cardId, key: row.key!, suit: row.suit!, value: row.value ?? 0 }
+            : undefined;
+          return (
+            <span className="reveal-stage" key={`${row.cardId}-${row.revealedToPlayerId}`}>
+              <CountdownRing reveal={row} />
+              <CardFace face={face} asButton={false} />
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -100,9 +96,21 @@ function HandCard({
   slotIndex: number;
   viewerId: PlayerId;
 }) {
-  const { view } = useGame();
+  const { view, reveals } = useGame();
   const { localPhase, armed, onCardTap, shake, raceFade } = useTableInput();
   if (!view) return null;
+
+  const reveal = reveals.find(
+    (row) =>
+      row.cardId === slot.id &&
+      row.kind === 'INITIAL_PEEK' &&
+      row.revealedToPlayerId === viewerId &&
+      row.key &&
+      row.suit,
+  );
+  const face: PublicCardView | undefined = reveal
+    ? { id: reveal.cardId, key: reveal.key!, suit: reveal.suit!, value: reveal.value ?? 0 }
+    : undefined;
 
   const powerMode = powerModeFromView(view, viewerId);
   const targeting =
@@ -115,30 +123,33 @@ function HandCard({
     : false;
   const isArmed = armed?.ownerId === ownerId && armed.slotIndex === slotIndex;
   const dimmed = targeting && !legal && !isArmed;
-  const knownKey = slot.known ? slot.key : null;
   const ambient =
-    ownerId === viewerId && slot.known && (slot.key === 'HEAVEN' || slot.key === 'HELL')
-      ? slot.key === 'HEAVEN'
+    ownerId === viewerId && face && (face.key === 'HEAVEN' || face.key === 'HELL')
+      ? face.key === 'HEAVEN'
         ? 'heaven'
         : 'hell'
       : null;
   const shaking = shake?.ownerId === ownerId && shake.slotIndex === slotIndex;
 
   return (
-    <CardFace
-      key={shaking ? `${slot.id}-${shake?.token}` : slot.id}
-      slot={slot}
-      selectable={!locked && (targeting ? legal : localPhase === 'idle')}
-      armed={isArmed}
-      dimmed={dimmed}
-      legalTarget={legal && targeting}
-      locked={locked}
-      shaking={shaking}
-      raceFade={raceFade && isArmed}
-      matchRank={isArmed && view.discardTop ? rankSpokenName(view.discardTop.key) : null}
-      ambient={ambient}
-      onClick={() => onCardTap(ownerId, slotIndex, slot.id, knownKey)}
-    />
+    <span className="card-reveal-wrap">
+      {reveal && <CountdownRing reveal={reveal} />}
+      <CardFace
+        key={shaking ? `${slot.id}-${shake?.token}` : slot.id}
+        slot={slot}
+        face={face}
+        selectable={!locked && (targeting ? legal : localPhase === 'idle')}
+        armed={isArmed}
+        dimmed={dimmed}
+        legalTarget={legal && targeting}
+        locked={locked}
+        shaking={shaking}
+        raceFade={raceFade && isArmed}
+        matchRank={isArmed && view.discardTop ? rankSpokenName(view.discardTop.key) : null}
+        ambient={ambient}
+        onClick={() => onCardTap(ownerId, slotIndex, slot.id)}
+      />
+    </span>
   );
 }
 
@@ -230,13 +241,13 @@ function TableBody() {
 
   if (!view) return null;
 
-  const opponents = view.seating.filter((id) => id !== viewerId);
+  const opponents = (view.seating ?? []).filter((id) => id !== viewerId);
   const canDraw = localPhase === 'TURN_DRAW';
 
   return (
     <div
       className="table-layout"
-      data-size={tableSize(view.seating.length)}
+      data-size={tableSize(view.seating?.length ?? 0)}
       onClick={onBackgroundTap}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onBackgroundTap();
@@ -245,7 +256,7 @@ function TableBody() {
       {view.phase === 'FINAL_ROUND' && (
         <div className="final-banner">
           Final round
-          {view.finalRoundRemaining.length > 0
+          {view.finalRoundRemaining?.length
             ? ` · ${view.finalRoundRemaining.length} turn${view.finalRoundRemaining.length === 1 ? '' : 's'} left`
             : ''}
         </div>
@@ -320,7 +331,7 @@ function TableBody() {
 
       {view.players[viewerId] && <PlayerPod id={viewerId} you />}
 
-      <RevealLift view={view} viewerId={viewerId} />
+      <RevealLift viewerId={viewerId} />
 
       {cambeoFlash && (
         <div className="cambeo-moment" aria-live="assertive">

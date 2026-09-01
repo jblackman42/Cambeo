@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HOUSE_RULES, validateForTable, deckSize } from '@cambeo/shared';
-import { createGame, knows } from '../index.js';
+import { createGame, viewFor } from '../index.js';
 import {
   apply,
   DEFAULT_PLAYERS,
@@ -19,23 +19,30 @@ describe('setup', () => {
     }
   });
 
-  it('reveals exactly initialRevealCount slots to the owner and no one else', () => {
-    const state = startPlaying();
+  it('emits CARD_REVEALED for exactly initialRevealCount slots to the owner and no one else', () => {
+    let state = createGame(DEFAULT_PLAYERS, 'seed', HOUSE_RULES);
+    state = apply(state, { type: 'START_GAME', playerId: P1 });
     for (const owner of DEFAULT_PLAYERS) {
-      const hand = state.players[owner]!.hand;
-      const revealed = hand.slice(0, HOUSE_RULES.initialRevealCount);
-      const hidden = hand.slice(HOUSE_RULES.initialRevealCount);
-
-      for (const cardId of revealed) {
-        expect(knows(state, owner, cardId)).toBe(true);
+      const view = viewFor(state, owner, HOUSE_RULES);
+      const own = view.lastEvents.filter(
+        (e) => e.type === 'CARD_REVEALED' && e.revealedToPlayerId === owner && e.key,
+      );
+      expect(own).toHaveLength(HOUSE_RULES.initialRevealCount);
+      for (const event of own) {
+        if (event.type !== 'CARD_REVEALED') continue;
+        expect(event.kind).toBe('INITIAL_PEEK');
+        expect(event.durationMs).toBe(HOUSE_RULES.initialPeekDurationMs);
+        expect(event.ownerId).toBe(owner);
       }
-      for (const cardId of hidden) {
-        expect(knows(state, owner, cardId)).toBe(false);
+      for (const slot of view.players[owner]!.hand) {
+        expect(slot.known).toBe(false);
       }
       for (const other of DEFAULT_PLAYERS.filter((p) => p !== owner)) {
-        for (const cardId of hand) {
-          expect(knows(state, other, cardId)).toBe(false);
-        }
+        const otherView = viewFor(state, other, HOUSE_RULES);
+        const leaked = otherView.lastEvents.filter(
+          (e) => e.type === 'CARD_REVEALED' && e.revealedToPlayerId === owner && e.key,
+        );
+        expect(leaked).toHaveLength(0);
       }
     }
   });

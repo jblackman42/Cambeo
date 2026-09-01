@@ -1,6 +1,5 @@
 import {
   POWER_DEFINITIONS,
-  matchKeyFor,
   powerStepLacksLegalTarget,
   type Action,
   type CardKey,
@@ -48,11 +47,8 @@ export type CardTapInput = {
   cardId: string;
   cambeoCallerId: PlayerId | null;
   armed: ArmedFlip | null;
-  /** Identity of this slot if the viewer already knows it. */
-  knownKey: CardKey | null;
   discardKey: CardKey | null;
   discardId: string | null;
-  skipWrongFlipConfirm: boolean;
   powerMode?: PowerTargetingMode;
 };
 
@@ -65,12 +61,6 @@ export type TargetAction = Extract<
 export type CardTapResult =
   | { kind: 'arm'; armed: ArmedFlip }
   | { kind: 'commit'; action: FlipAttemptAction }
-  | {
-      kind: 'confirm-wrong';
-      armed: ArmedFlip;
-      knownKey: CardKey;
-      discardKey: CardKey;
-    }
   | { kind: 'disarm' }
   | { kind: 'target'; action: TargetAction }
   | { kind: 'noop'; shake: boolean; reason: string };
@@ -205,18 +195,6 @@ export function routeCardTap(input: CardTapInput): CardTapResult {
   }
 
   if (input.armed && isArmedTarget(input.armed, input)) {
-    if (
-      input.knownKey &&
-      matchKeyFor(input.knownKey) !== matchKeyFor(input.discardKey) &&
-      !input.skipWrongFlipConfirm
-    ) {
-      return {
-        kind: 'confirm-wrong',
-        armed: input.armed,
-        knownKey: input.knownKey,
-        discardKey: input.discardKey,
-      };
-    }
     return { kind: 'commit', action: flipAttempt(input.viewerId, input.ownerId, input.slotIndex) };
   }
 
@@ -269,7 +247,7 @@ export type ActionBarCopy = {
 
 function swapProgress(powerId: PowerId, stepIndex: number): { selected: number; total: number } | null {
   const def = POWER_DEFINITIONS[powerId];
-  const swapSteps = def.steps
+  const swapSteps = (def?.steps ?? [])
     .map((step, i) => ({ step, i }))
     .filter(({ step }) => step.effect === 'SELECT_FOR_SWAP');
   if (swapSteps.length < 2) return null;
@@ -280,7 +258,7 @@ function swapProgress(powerId: PowerId, stepIndex: number): { selected: number; 
 
 export function powerActionCopy(powerId: PowerId, stepIndex: number): ActionBarCopy {
   const def = POWER_DEFINITIONS[powerId];
-  const step = def.steps[stepIndex];
+  const step = def?.steps[stepIndex];
   const title =
     powerId === 'LOOK_THEN_BLIND_SWAP'
       ? 'Look and Swap'
@@ -297,7 +275,7 @@ export function powerActionCopy(powerId: PowerId, stepIndex: number): ActionBarC
                 : powerId;
 
   const revealThenSwap = powerId === 'LOOK_THEN_BLIND_SWAP';
-  const userStepCount = revealThenSwap ? 2 : def.steps.length;
+  const userStepCount = revealThenSwap ? 2 : (def?.steps.length ?? 1);
   let userStep = stepIndex + 1;
   if (revealThenSwap) {
     userStep = stepIndex === 0 ? 1 : 2;
@@ -360,10 +338,10 @@ export function powerStepNeedsSkip(view: RedactedGameView, viewerId: PlayerId): 
   return powerStepLacksLegalTarget({
     powerId: pending.powerId,
     stepIndex: pending.stepIndex,
-    selections: pending.selections,
+    selections: pending.selections ?? [],
     actorId: pending.playerId,
     cambeoCallerId: view.cambeoCallerId,
-    seating: view.seating,
+    seating: view.seating ?? [],
     cardCount: (id) => view.players[id]?.cardCount ?? 0,
   });
 }

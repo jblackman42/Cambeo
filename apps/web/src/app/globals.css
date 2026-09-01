@@ -869,6 +869,12 @@ button {
   border-color: var(--border-strong);
 }
 
+.card-reveal-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
 .reveal-overlay {
   appearance: none;
   -webkit-appearance: none;
@@ -883,8 +889,16 @@ button {
   border: none;
   background: color-mix(in srgb, var(--bg) 55%, transparent);
   color: inherit;
-  cursor: pointer;
+  pointer-events: none;
   padding: 1.5rem;
+}
+
+.reveal-lift-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  justify-content: center;
+  align-items: center;
 }
 
 .reveal-stage {
@@ -900,30 +914,37 @@ button {
 
 .reveal-countdown {
   position: absolute;
-  inset: -10px;
-  width: calc(100% + 20px);
-  height: calc(100% + 20px);
+  inset: -12px;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
   pointer-events: none;
   overflow: visible;
+  z-index: 1;
 }
 
 .reveal-countdown rect {
   fill: none;
-  stroke: var(--accent);
-  stroke-width: 3;
+  stroke: var(--text-muted, rgba(255, 255, 255, 0.55));
+  stroke-width: 8;
   stroke-linecap: round;
   stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-  animation: reveal-ring 2.5s linear forwards;
+  stroke-dashoffset: var(--reveal-from, 0);
+  animation: reveal-ring var(--reveal-ms, 4s) linear forwards;
 }
 
-.reveal-overlay:focus-visible {
-  outline: none;
+.reveal-countdown[data-warning='true'] rect {
+  stroke: var(--accent);
 }
 
-.reveal-overlay:focus-visible .reveal-stage {
-  outline: 2px solid var(--accent);
-  outline-offset: 8px;
+.card-reveal-wrap .reveal-countdown {
+  inset: -8px;
+  width: calc(100% + 16px);
+  height: calc(100% + 16px);
+}
+
+.card[data-known='true'] .card-art,
+.card[data-known='false'] .card-art {
+  transition: opacity var(--dur-base) var(--ease-in-out);
 }
 
 @keyframes reveal-lift {
@@ -1080,11 +1101,21 @@ a {
     transition-duration: 150ms !important;
   }
 
+  .reveal-countdown,
+  .reveal-countdown rect {
+    animation-duration: var(--reveal-ms, 4s) !important;
+  }
+
   .card[data-armed='true'],
   .card-hit:active .card,
   .drawn-card-wrap .card,
   .reveal-overlay .card,
   .cambeo-moment span {
     transform: none;
+  }
+
+  .reveal-overlay .card {
+    animation: none !important;
+    opacity: 1;
   }
 }

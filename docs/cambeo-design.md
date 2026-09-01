@@ -106,7 +106,7 @@ Opponent cards are face down almost the entire game. A face-down card is a card 
 
 **Reveals lift out of the layout.** When any card is revealed to you (a power, a flip resolution, final scoring), it animates up to a large centered size, holds, and returns to its slot. You never read a 30px-wide card face. This removes the size floor from the layout entirely.
 
-The initial peek is the exception: those two cards flip face up **in place**. The player needs to associate the value with the slot position, and lifting breaks that association.
+The initial peek is the exception: those cards flip face up **in place** until Got it (or the configured timer). The player needs to associate the value with the slot position, and lifting breaks that association.
 
 ### 4.2 Sizing
 
@@ -193,7 +193,7 @@ Bounce is for objects that were thrown. Interface chrome gets none.
 Cards fly out from the deck one at a time, staggered 40ms, spring to their slots. Full round of dealing under 1.2s. This happens once per game so it can be the most theatrical moment in the app.
 
 ### 6.2 Initial peek
-Your two known cards flip face up in place after the deal, hold for a configurable timer with a visible countdown ring, then flip back. Do not lift these; the player needs to associate the value with the slot position, and lifting breaks that association. This is the one reveal that stays in place.
+Your starting cards flip face up **in place** after the deal, hold until you tap Got it (or until `initialPeekDurationMs`, whichever comes first) with a visible countdown ring, then flip back. Do not lift these; the player needs to associate the value with the slot position, and lifting breaks that association. This is the one reveal that stays in place. The last 1.5s of the ring shifts to the accent color. Do not shrink or fade the card early.
 
 ### 6.3 Draw from deck
 Card lifts off the deck, scales up, and settles into a held position above your hand. 240ms, `--ease-out`. It is face up to you only. The action prompt fades in underneath at 90ms delay.
@@ -209,7 +209,8 @@ The two cards cross. The drawn card travels down into the slot while the replace
 
 ### 6.7 Powers
 
-- **Peek own / peek other:** target slot pulses gold, then the card lifts to center at 180px, holds 2.5s with a countdown ring, and returns. Only the acting player sees the face; everyone else sees the lift with a card back and knows a peek happened.
+- **Peek own / peek other:** target slot pulses gold, then the card lifts to center at 180px, holds for `powerRevealDurationMs` with a countdown ring, flips face down, and returns to its slot. Only the acting player sees the face; everyone else sees the lift with a card back and knows a peek happened. The last 1.5s of the ring shifts to the accent color. Do not shrink or fade the card early.
+- **Look then optional swap:** both looked cards lift the same way, each on its own timer.
 - **Blind swap:** both targets pulse, then the two cards arc past each other in a wide curve and land in each other's slots, both face down. The arc must be visibly wide so the audience can track which two slots were involved. 500ms.
 - **Look then blind swap:** reveal lift resolves first, then the swap arc. Two distinct beats, do not overlap them.
 - **Shuffle target hand:** cards lift slightly, cross rapidly in an overlapping scramble, and land. Deliberately hard to track, which is the point.
@@ -223,7 +224,6 @@ This is the race path. Speed over beauty. **Single-tap flipping is not used.** A
 - **Disarm** with no penalty and no server call: tap a different card (which arms that one instead), tap the table background, tap cancel, or wait 4 seconds.
 - **Correct flip:** card flips face up, gets a green rim flash (plus motion and sound — never color alone), and shoots to the discard pile. Total under 400ms. Positive sound, sharp haptic.
 - **Wrong flip:** card shakes horizontally, red rim flash, and a penalty card flies from the deck into the offender's hand. Under 400ms. Dull sound, buzz haptic. A message names both cards and the consequence, held at least 2.5 seconds, dismissible early by tap.
-- **Known mismatch:** if the player arms a card whose identity they already know, and it does not match the discard, the commit tap raises a confirmation instead of firing. Unknown cards commit on the second tap with no extra step.
 - **Lost the race:** if the server rejects your attempt because someone beat you, the card returns to rest with a short fade, no error styling. You did not do anything wrong.
 - Flips happening to you while it is not your turn need a peripheral cue: brief screen-edge glow in the relevant color plus haptic, because you will be looking somewhere else.
 
@@ -255,7 +255,7 @@ Sequential reveal, not simultaneous. Each player's hand flips one card at a time
 
 ## 8. Accessibility and input
 
-- `prefers-reduced-motion: reduce` replaces all travel and flourish with 150ms cross-fades. Cards change state without moving. Keep the reveal lift as a scale-free fade. Do not ship a version that removes the information the motion was carrying.
+- `prefers-reduced-motion: reduce` replaces all travel and flourish with 150ms cross-fades. Cards change state without moving. Keep the reveal lift as a scale-free fade. The flip back still happens on schedule — reduced motion never means a longer or permanent reveal. The countdown ring keeps its full duration.
 - Minimum 44px touch target on every interactive element. At the 30px card floor, opponent cards need an invisible expanded hit area.
 - Gate all hover styling behind `@media (hover: hover) and (pointer: fine)`.
 - Focus rings in `--accent` on every interactive element, visible, never removed.

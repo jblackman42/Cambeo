@@ -14,12 +14,11 @@ describe('redaction', () => {
     expect(s1).toBeDefined();
     const own = s1!.view.players.p1!.hand;
     const opp = s1!.view.players.p2!.hand;
-    const knownOwn = own.filter((s) => s.known);
-    expect(knownOwn.length).toBe(HOUSE_RULES.initialRevealCount);
-    for (const slot of knownOwn) {
-      expect(slot.known).toBe(true);
-      if (slot.known) expect(slot.key).toBeTruthy();
-    }
+    expect(own.every((s) => !s.known)).toBe(true);
+    const peeks = s1!.lastEvents.filter(
+      (e) => e.type === 'CARD_REVEALED' && e.revealedToPlayerId === 'p1' && e.key,
+    );
+    expect(peeks).toHaveLength(HOUSE_RULES.initialRevealCount);
     for (const slot of opp) {
       expect(slot.known).toBe(false);
       expect('key' in slot).toBe(false);

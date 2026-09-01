@@ -210,6 +210,34 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           />
         </label>
         <label className="field">
+          Initial peek duration (ms)
+          <input
+            type="number"
+            min={500}
+            step={500}
+            value={draft.initialPeekDurationMs}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (!Number.isInteger(n)) return;
+              setScalar('initialPeekDurationMs', n);
+            }}
+          />
+        </label>
+        <label className="field">
+          Power reveal duration (ms)
+          <input
+            type="number"
+            min={500}
+            step={500}
+            value={draft.powerRevealDurationMs}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (!Number.isInteger(n)) return;
+              setScalar('powerRevealDurationMs', n);
+            }}
+          />
+        </label>
+        <label className="field">
           Loss threshold
           <input
             type="number"

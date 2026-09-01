@@ -20,6 +20,8 @@ export const RuleSetSchema = z
     powers: powersSchema,
     handSize: z.number().int().min(HAND_SIZE_MIN).max(HAND_SIZE_MAX),
     initialRevealCount: z.number().int().min(0),
+    initialPeekDurationMs: z.number().int().positive(),
+    powerRevealDurationMs: z.number().int().positive(),
     lossThreshold: z.number().int().min(1),
     minPlayers: z.number().int().min(2),
     maxPlayers: z.number().int().min(2),

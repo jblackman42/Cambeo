@@ -85,8 +85,6 @@ export function stackState(
     discard?: StackedCard[];
     phase?: GameState['phase'];
     turnPlayerId?: PlayerId;
-    knowledge?: Record<PlayerId, CardId[]>;
-    clearKnowledge?: boolean;
   },
 ): GameState {
   const cards: GameState['cards'] = {};
@@ -119,33 +117,6 @@ export function stackState(
   const deck = (opts.deck ?? []).map(make);
   const discard = (opts.discard ?? []).map(make);
 
-  const knowledge = opts.clearKnowledge
-    ? Object.fromEntries(state.seating.map((id) => [id, {} as Record<CardId, true>]))
-    : { ...state.knowledge };
-
-  // Ensure knowledge maps exist for all players
-  for (const pid of state.seating) {
-    knowledge[pid] = { ...(knowledge[pid] ?? {}) };
-  }
-
-  if (opts.knowledge) {
-    for (const [pid, cardIds] of Object.entries(opts.knowledge)) {
-      const map = { ...(knowledge[pid] ?? {}) };
-      for (const id of cardIds) {
-        map[id] = true;
-      }
-      knowledge[pid] = map;
-    }
-  }
-
-  // Discard top is public
-  if (discard.length > 0) {
-    const top = discard[discard.length - 1]!;
-    for (const pid of state.seating) {
-      knowledge[pid] = { ...knowledge[pid], [top]: true };
-    }
-  }
-
   return {
     ...state,
     cards: { ...state.cards, ...cards },
@@ -161,7 +132,6 @@ export function stackState(
     drawnCard: null,
     pendingPower: null,
     pendingGive: null,
-    knowledge,
   };
 }
 
@@ -170,7 +140,6 @@ export function startStacked(
     hands: Record<PlayerId, StackedCard[]>;
     deck?: StackedCard[];
     discard?: StackedCard[];
-    knowledge?: Record<PlayerId, 'initial' | CardId[]>;
     players?: PlayerId[];
     seed?: string;
     ruleSet?: RuleSet;
@@ -183,26 +152,11 @@ export function startStacked(
     hands: opts.hands,
     deck: opts.deck,
     discard: opts.discard,
-    clearKnowledge: true,
     phase: 'TURN_DRAW',
     turnPlayerId: players[0],
   });
 
-  // Grant initial-style knowledge: first N cards per hand known to owner
-  const knowledge = { ...state.knowledge };
-  for (const pid of players) {
-    const hand = state.players[pid]!.hand;
-    const known: Record<CardId, true> = {};
-    for (let i = 0; i < Math.min(ruleSet.initialRevealCount, hand.length); i++) {
-      known[hand[i]!] = true;
-    }
-    // discard top
-    if (state.discard.length > 0) {
-      known[state.discard[state.discard.length - 1]!] = true;
-    }
-    knowledge[pid] = known;
-  }
-  return { ...state, knowledge };
+  return state;
 }
 
 export function findSlot(

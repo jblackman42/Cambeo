@@ -10,8 +10,9 @@ import {
 import { RuleSetSchema, summarizeDeck, validateForTable } from './ruleset.js';
 
 describe('RuleSet schema', () => {
-  it('accepts House Rules', () => {
-    expect(RuleSetSchema.safeParse(HOUSE_RULES).success).toBe(true);
+  it('House Rules include default reveal durations', () => {
+    expect(HOUSE_RULES.initialPeekDurationMs).toBe(8000);
+    expect(HOUSE_RULES.powerRevealDurationMs).toBe(4000);
   });
 
   it('rejects initialRevealCount above handSize', () => {

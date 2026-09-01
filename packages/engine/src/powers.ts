@@ -9,8 +9,8 @@ import type { Action } from './actions.js';
 import type { GameEvent } from './events.js';
 import type { GameState, PendingPower, PowerTarget } from './state.js';
 import type { Rng } from './rng.js';
-import { grantKnowledge, clearKnowledgeForCards } from './knowledge.js';
-import { getCard, isCambeoCallerProtected, reject, withRng } from './setup.js';
+import { cardRevealedEvent } from './reveal.js';
+import { isCambeoCallerProtected, reject, withRng } from './setup.js';
 import { swapSlots } from './turn.js';
 import { advanceAfterTurnAction } from './cambeo.js';
 
@@ -238,8 +238,6 @@ export function resolvePowerTarget(
         [action.target.playerId]: { ...targetPlayer, hand: shuffled },
       },
     };
-    // Shuffle destroys slot knowledge of those cards for everyone
-    next = clearKnowledgeForCards(next, shuffled);
     events.push({
       type: 'POWER_SHUFFLE',
       playerId: action.playerId,
@@ -273,19 +271,17 @@ export function resolvePowerTarget(
 
   selections.push(cardTarget);
   const cardId = next.players[cardTarget.playerId]!.hand[cardTarget.slotIndex]!;
-  const card = getCard(next, cardId);
 
   if (step.effect === 'REVEAL') {
-    next = grantKnowledge(next, action.playerId, [cardId]);
-    events.push({
-      type: 'POWER_REVEAL',
-      playerId: action.playerId,
-      targetPlayerId: cardTarget.playerId,
-      slotIndex: cardTarget.slotIndex,
-      cardId,
-      key: card.key,
-      suit: card.suit,
-    });
+    events.push(
+      cardRevealedEvent(next, ruleSet, {
+        revealedToPlayerId: action.playerId,
+        ownerId: cardTarget.playerId,
+        slotIndex: cardTarget.slotIndex,
+        cardId,
+        kind: 'POWER',
+      }),
+    );
     if (pending.powerId === 'LOOK_THEN_OPTIONAL_SWAP') {
       revealedForOptionalSwap.push({
         playerId: cardTarget.playerId,

@@ -50,6 +50,8 @@ export const HOUSE_RULES: RuleSet = {
   powers: HOUSE_POWERS,
   handSize: 4,
   initialRevealCount: 2,
+  initialPeekDurationMs: 8000,
+  powerRevealDurationMs: 4000,
   lossThreshold: 6,
   minPlayers: 3,
   maxPlayers: 8,

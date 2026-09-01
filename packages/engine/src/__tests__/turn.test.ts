@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HOUSE_RULES } from '@cambeo/shared';
-import { knows } from '../index.js';
+import { viewFor } from '../index.js';
 import {
   apply,
   findSlot,
@@ -69,7 +69,7 @@ describe('turn', () => {
     expect(hasEvent(state, 'CARD_REPLACED')).toBe(true);
   });
 
-  it('replace updates the owner knowledge of the new card', () => {
+  it('replace does not leave the new card known in the slot', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
@@ -81,8 +81,11 @@ describe('turn', () => {
     });
     state = apply(state, { type: 'DRAW_DECK', playerId: P1 });
     const newId = state.drawnCard!;
+    expect(viewFor(state, P1, HOUSE_RULES).drawnCard?.id).toBe(newId);
     state = apply(state, { type: 'REPLACE_CARD', playerId: P1, slotIndex: 3 });
-    expect(knows(state, P1, newId)).toBe(true);
+    const view = viewFor(state, P1, HOUSE_RULES);
+    expect(view.drawnCard).toBeNull();
+    expect(view.players[P1]!.hand.find((s) => s.id === newId)?.known).toBe(false);
   });
 
   it('out-of-turn draw is rejected', () => {
@@ -121,7 +124,10 @@ describe('turn', () => {
     expect(state.players[P1]!.hand).toContain(keptId);
     expect(state.pendingPower).toBeNull();
     expect(hasEvent(state, 'CARD_KEPT')).toBe(true);
-    expect(knows(state, P1, keptId)).toBe(true);
+    expect(viewFor(state, P1, HOUSE_RULES).drawnCard).toBeNull();
+    expect(viewFor(state, P1, HOUSE_RULES).players[P1]!.hand.find((s) => s.id === keptId)?.known).toBe(
+      false,
+    );
     expect(state.turn?.playerId).toBe(P2);
   });
 

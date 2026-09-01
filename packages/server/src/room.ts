@@ -457,7 +457,7 @@ export class RoomController {
     const now = this.deps.now();
     const view = viewFor(this.game!, viewerId, this.ruleSet);
     if (mode === 'deliver') {
-      return { ...view, lastEvents: stampRevealExpiry(view.lastEvents, now) };
+      return { ...view, lastEvents: stampRevealExpiry(view.lastEvents, now, this.seq) };
     }
     if (mode === 'snapshot') {
       return {
@@ -525,9 +525,21 @@ export class RoomController {
   }
 }
 
-function stampRevealExpiry(events: GameEvent[], now: number): GameEvent[] {
-  return events.map((event) =>
-    event.type === 'CARD_REVEALED' ? { ...event, expiresAt: now + event.durationMs } : event,
+/**
+ * Stamp server-authoritative expiry and a unique id on each reveal. The id is derived from the
+ * room sequence rather than a random source so it is deterministic and testable; the client
+ * dedupes on it, which lets a genuinely new look at the same card refresh the timer while a
+ * replayed event still cannot extend one.
+ */
+function stampRevealExpiry(events: GameEvent[], now: number, seq: number): GameEvent[] {
+  return events.map((event, index) =>
+    event.type === 'CARD_REVEALED'
+      ? {
+          ...event,
+          revealId: `${seq}:${index}:${event.cardId}:${event.revealedToPlayerId}`,
+          expiresAt: now + event.durationMs,
+        }
+      : event,
   );
 }
 
@@ -542,6 +554,7 @@ function stripRevealIdentity(events: GameEvent[]): GameEvent[] {
       revealedToPlayerId: event.revealedToPlayerId,
       kind: event.kind,
       durationMs: event.durationMs,
+      ...(event.revealId !== undefined ? { revealId: event.revealId } : {}),
       ...(event.expiresAt !== undefined ? { expiresAt: event.expiresAt } : {}),
     };
   });

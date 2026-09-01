@@ -4,6 +4,7 @@ import type { GameEvent } from './events.js';
 import type { GameState } from './state.js';
 import type { Rng } from './rng.js';
 import { getCard, isCambeoCallerProtected, reject, withRng } from './setup.js';
+import { cardRevealedEvent } from './reveal.js';
 import { addCardToHand, drawFromDeck, removeCardFromHand } from './turn.js';
 import { specialCardHooks } from './extensions/heavenHell.js';
 import {
@@ -204,7 +205,10 @@ function resolveFailedFlip(
   ruleSet: RuleSet,
   rng: Rng,
 ): GameState {
-  const card = getCard(state, flippedCardId);
+  // A wrong flip turns the card face up for the whole table, then it goes back into the hand.
+  // That is a reveal like any other, so it is time-boxed rather than carried on FLIP_FAIL: the
+  // card stays in play, and a permanent identity on a public event is exactly the leak the
+  // reveal model exists to prevent.
   const events: GameEvent[] = [
     {
       type: 'FLIP_FAIL',
@@ -212,8 +216,16 @@ function resolveFailedFlip(
       targetPlayerId: action.target.playerId,
       slotIndex: action.target.slotIndex,
       cardId: flippedCardId,
-      key: card.key,
     },
+    ...state.seating.map((viewerId) =>
+      cardRevealedEvent(state, ruleSet, {
+        revealedToPlayerId: viewerId,
+        ownerId: action.target.playerId,
+        slotIndex: action.target.slotIndex,
+        cardId: flippedCardId,
+        kind: 'FLIP_FAIL',
+      }),
+    ),
   ];
 
   let next = state;

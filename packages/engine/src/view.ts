@@ -47,6 +47,7 @@ function redactEvent(viewerId: PlayerId, event: GameEvent): GameEvent {
         revealedToPlayerId: event.revealedToPlayerId,
         kind: event.kind,
         durationMs: event.durationMs,
+        ...(event.revealId !== undefined ? { revealId: event.revealId } : {}),
         ...(event.expiresAt !== undefined ? { expiresAt: event.expiresAt } : {}),
       };
     }
@@ -98,12 +99,33 @@ export function assertViewIdentityInvariant(view: RedactedGameView): void {
       }
     }
   }
+
+  // Any event carrying a face key is an identity channel. Only two are legitimate: a reveal
+  // addressed to this viewer, and a card whose identity this view already makes public anyway
+  // (the discard top, or every hand once scoring starts). Checking the whole event list rather
+  // than CARD_REVEALED alone is what stops a new event type from quietly reopening the leak.
+  const publiclyKnown = new Set<CardId>();
+  if (view.discardTop) publiclyKnown.add(view.discardTop.id);
+  if (view.drawnCard) publiclyKnown.add(view.drawnCard.id);
+  if (view.phase === 'SCORING' || view.phase === 'OVER') {
+    for (const player of Object.values(view.players)) {
+      for (const slot of player.hand) publiclyKnown.add(slot.id);
+    }
+  }
+
   for (const event of view.lastEvents) {
-    if (event.type === 'CARD_REVEALED' && event.key !== undefined) {
-      if (event.revealedToPlayerId !== view.viewerId) {
+    if (event.type === 'CARD_REVEALED') {
+      if (event.key !== undefined && event.revealedToPlayerId !== view.viewerId) {
         throw new Error('INVARIANT: CARD_REVEALED identity leaked to another player');
       }
+      continue;
     }
+    const carried = event as { cardId?: CardId; key?: string };
+    if (carried.key === undefined) continue;
+    if (carried.cardId !== undefined && publiclyKnown.has(carried.cardId)) continue;
+    throw new Error(
+      `INVARIANT: ${event.type} carried a face key outside a reveal addressed to the viewer`,
+    );
   }
 }
 

@@ -238,6 +238,20 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           />
         </label>
         <label className="field">
+          Missed-flip reveal duration (ms)
+          <input
+            type="number"
+            min={500}
+            step={500}
+            value={draft.flipRevealDurationMs}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (!Number.isInteger(n)) return;
+              setScalar('flipRevealDurationMs', n);
+            }}
+          />
+        </label>
+        <label className="field">
           Loss threshold
           <input
             type="number"

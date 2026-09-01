@@ -14,6 +14,13 @@ describe('RuleSet schema', () => {
   it('House Rules include default reveal durations', () => {
     expect(HOUSE_RULES.initialPeekDurationMs).toBe(8000);
     expect(HOUSE_RULES.powerRevealDurationMs).toBe(4000);
+    expect(HOUSE_RULES.flipRevealDurationMs).toBe(2500);
+  });
+
+  it('rejects a non-positive reveal duration', () => {
+    expect(
+      RuleSetSchema.safeParse({ ...HOUSE_RULES, flipRevealDurationMs: 0 }).success,
+    ).toBe(false);
   });
 
   it('rejects initialRevealCount above handSize', () => {
@@ -49,6 +56,7 @@ describe('repairRuleSet', () => {
     const partial: Record<string, unknown> = { ...HOUSE_RULES };
     delete partial.initialPeekDurationMs;
     delete partial.powerRevealDurationMs;
+    delete partial.flipRevealDurationMs;
     return partial;
   };
 
@@ -64,6 +72,7 @@ describe('repairRuleSet', () => {
     expect(repaired.jokers).toBe(false);
     expect(repaired.handSize).toBe(5);
     expect(repaired.initialPeekDurationMs).toBe(HOUSE_RULES.initialPeekDurationMs);
+    expect(repaired.flipRevealDurationMs).toBe(HOUSE_RULES.flipRevealDurationMs);
   });
 
   it('falls back to House Rules for junk', () => {
@@ -135,11 +144,13 @@ describe('ruleset codec', () => {
     custom.initialRevealCount = 1;
     custom.values.Q_RED = 0;
     custom.powers['10'] = 'NONE';
+    custom.flipRevealDurationMs = 1800;
     const code = encodeRuleSetCode(custom);
     expect(code.startsWith('c1.')).toBe(true);
     const decoded = decodeRuleSetCode(code);
     expect(decoded).not.toBeNull();
     expect(ruleSetsEqual(decoded!, custom)).toBe(true);
+    expect(decoded!.flipRevealDurationMs).toBe(1800);
     expect(isHouseRules(decoded!)).toBe(false);
   });
 

@@ -24,9 +24,14 @@ Flipping is a race. Two players tapping the same card 80ms apart is a normal occ
 | --- | --- |
 | Every turn (draw, discard, replace) | 200–320ms, functional, no flourish |
 | Flip attempt feedback | Under 120ms to first visible response |
-| Several times per game (powers, peeks, give-a-card) | 320–500ms, expressive |
+| Several times per game (powers, peeks, give-a-card) | 320–500ms of *travel*, expressive |
 | Once or twice per game (cambeo call, hell onto heaven, final scoring) | Up to 1.5s, full flourish |
 | Never | Anything that blocks input while it plays |
+
+The budget covers motion, not reading time. A reveal's **hold** is a separate, rule-configured
+duration (`initialPeekDurationMs`, `powerRevealDurationMs`, `flipRevealDurationMs`) and is far longer
+than any figure above — the player is reading a card, not watching an animation. Only the lift and
+the flip back are bound by the table.
 
 If an animation would delay a player's ability to act, it is wrong, no matter how good it looks.
 
@@ -77,7 +82,7 @@ These two cards carry a 19-point swing and must never be confused. Treat them as
 
 - Heaven: cool pale blue rim light on the card frame, plus the word HEAVEN set in the frame.
 - Hell: ember orange rim light, plus the word HELL.
-- Both get a slow, subtle ambient animation when in your own hand and known to you: heaven a faint upward drift on the glow, hell a slow flicker. Under 10% opacity variation. This is peripheral awareness, not decoration.
+- Both get a slow, subtle ambient animation **while their face is showing to you** — during an unexpired reveal of your own card, or on the discard pile: heaven a faint upward drift on the glow, hell a slow flicker. Under 10% opacity variation. This is peripheral awareness, not decoration. It cannot persist after the reveal expires, because at that point the app no longer knows the card either.
 - When heaven is on top of the discard pile, the pile itself gets the heaven rim light. That is the only window in which hell can be discarded and nobody should miss it.
 
 ### 2.5 Light mode
@@ -215,6 +220,8 @@ The two cards cross. The drawn card travels down into the slot while the replace
 - **Look then blind swap:** reveal lift resolves first, then the swap arc. Two distinct beats, do not overlap them.
 - **Shuffle target hand:** cards lift slightly, cross rapidly in an overlapping scramble, and land. Deliberately hard to track, which is the point.
 
+A missed flip reveals the same way (§6.8), but to every seat rather than one.
+
 ### 6.8 Flip attempt
 
 This is the race path. Speed over beauty. **Single-tap flipping is not used.** A flip is arm, then commit.
@@ -223,7 +230,7 @@ This is the race path. Speed over beauty. **Single-tap flipping is not used.** A
 - **Commit.** A second tap on that same card sends the flip attempt. Instant local depress `scale(0.96)` at `--dur-instant`, optimistic, before the server responds.
 - **Disarm** with no penalty and no server call: tap a different card (which arms that one instead), tap the table background, tap cancel, or wait 4 seconds.
 - **Correct flip:** card flips face up, gets a green rim flash (plus motion and sound — never color alone), and shoots to the discard pile. Total under 400ms. Positive sound, sharp haptic.
-- **Wrong flip:** card shakes horizontally, red rim flash, and a penalty card flies from the deck into the offender's hand. Under 400ms. Dull sound, buzz haptic. A message names both cards and the consequence, held at least 2.5 seconds, dismissible early by tap.
+- **Wrong flip:** card shakes horizontally, red rim flash, and a penalty card flies from the deck into the offender's hand. Under 400ms. Dull sound, buzz haptic. The flipped card lifts face up **to the whole table** for `flipRevealDurationMs` with a countdown ring, then returns to its slot face down — at a physical table a wrong flip exposes the card to everyone, and this is that moment. A message names both cards and the consequence for the same window, dismissible early by tap. The card stays in the target's hand, so nothing may name it after the reveal expires.
 - **Lost the race:** if the server rejects your attempt because someone beat you, the card returns to rest with a short fade, no error styling. You did not do anything wrong.
 - Flips happening to you while it is not your turn need a peripheral cue: brief screen-edge glow in the relevant color plus haptic, because you will be looking somewhere else.
 

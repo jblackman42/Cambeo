@@ -2,8 +2,14 @@
 
 import type { GameEvent } from '@cambeo/shared';
 import { useGame } from '@/lib/play-context';
+import type { ActiveReveal } from '@/lib/reveals';
 
-function describe(event: GameEvent, names: Record<string, string>, discardKey?: string): string {
+function describe(
+  event: GameEvent,
+  names: Record<string, string>,
+  discardKey?: string,
+  flippedKey?: string,
+): string {
   const n = (id: string) => names[id] ?? id;
   switch (event.type) {
     case 'ACTION_REJECTED':
@@ -26,6 +32,15 @@ function describe(event: GameEvent, names: Record<string, string>, discardKey?: 
       return `${n(event.playerId)} power: ${event.powerId}`;
     case 'CARD_REVEALED':
       return `${n(event.revealedToPlayerId)} peeked a card`;
+    case 'FLIP_SUCCESS':
+      return `${n(event.playerId)} flipped ${event.key} on ${n(event.targetPlayerId)}`;
+    case 'FLIP_FAIL':
+      // The card stays in the target's hand, so it may only be named while its reveal is live.
+      // Once the reveal expires the log must forget it too, or it becomes the persistent
+      // knowledge store the reveal model exists to remove.
+      return flippedKey && discardKey
+        ? `${n(event.playerId)} missed a flip — ${flippedKey} onto ${discardKey}. Penalty card.`
+        : `${n(event.playerId)} missed a flip. Penalty card.`;
     case 'POWER_SWAP':
       return `${n(event.playerId)} swapped two cards`;
     case 'POWER_SHUFFLE':
@@ -34,13 +49,6 @@ function describe(event: GameEvent, names: Record<string, string>, discardKey?: 
       return `Power done`;
     case 'POWER_STEP_SKIPPED':
       return `${n(event.playerId)} skipped a power step — ${event.reason.toLowerCase()}`;
-    case 'FLIP_SUCCESS':
-      return `${n(event.playerId)} flipped ${event.key} on ${n(event.targetPlayerId)}`;
-    case 'FLIP_FAIL': {
-      return discardKey
-        ? `${n(event.playerId)} missed a flip — ${event.key} onto ${discardKey}. Penalty card.`
-        : `${n(event.playerId)} missed a flip`;
-    }
     case 'PENALTY_DRAWN':
       return `${n(event.playerId)} drew a penalty`;
     case 'GIVE_REQUIRED':
@@ -62,11 +70,20 @@ function describe(event: GameEvent, names: Record<string, string>, discardKey?: 
   }
 }
 
+function liveFlipKey(reveals: ActiveReveal[], cardId: string): string | undefined {
+  return reveals.find((row) => row.kind === 'FLIP_FAIL' && row.cardId === cardId)?.key;
+}
+
 export function EventLog() {
-  const { view, names } = useGame();
+  const { view, names, reveals } = useGame();
   if (!view) return null;
 
-  const events = (view.lastEvents ?? []).filter((e) => e.type !== 'PHASE_CHANGED');
+  const events = (view.lastEvents ?? []).filter(
+    (e) =>
+      e.type !== 'PHASE_CHANGED' &&
+      // A failed flip fans one reveal out to every seat; the FLIP_FAIL line already covers it.
+      !(e.type === 'CARD_REVEALED' && e.kind === 'FLIP_FAIL'),
+  );
 
   return (
     <div className="panel">
@@ -77,7 +94,14 @@ export function EventLog() {
             <li>Waiting…</li>
           ) : (
             events.map((e, i) => (
-              <li key={`${e.type}-${i}`}>{describe(e, names, view.discardTop?.key)}</li>
+              <li key={`${e.type}-${i}`}>
+                {describe(
+                  e,
+                  names,
+                  view.discardTop?.key,
+                  e.type === 'FLIP_FAIL' ? liveFlipKey(reveals, e.cardId) : undefined,
+                )}
+              </li>
             ))
           )}
         </ul>

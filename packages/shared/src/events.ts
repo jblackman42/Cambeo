@@ -27,8 +27,14 @@ export type GameEvent =
       ownerId: PlayerId;
       slotIndex: number;
       revealedToPlayerId: PlayerId;
-      kind: 'INITIAL_PEEK' | 'POWER';
+      kind: 'INITIAL_PEEK' | 'POWER' | 'FLIP_FAIL';
       durationMs: number;
+      /**
+       * Unique per emitted reveal. Stamped by the room server; absent on raw engine events.
+       * The client dedupes on this so a replayed event cannot extend a live reveal, while a
+       * genuinely new look at the same card still refreshes the timer.
+       */
+      revealId?: string;
       /** Unix ms. Stamped by the room server; absent on raw engine events. */
       expiresAt?: number;
       key?: CardKey;
@@ -70,7 +76,6 @@ export type GameEvent =
       targetPlayerId: PlayerId;
       slotIndex: number;
       cardId: CardId;
-      key: CardKey;
     }
   | { type: 'PENALTY_DRAWN'; playerId: PlayerId; cardId: CardId }
   | { type: 'PENALTY_SKIPPED'; playerId: PlayerId; reason: string }

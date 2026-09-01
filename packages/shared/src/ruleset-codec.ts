@@ -13,6 +13,7 @@ interface RuleSetPatch {
   initialRevealCount?: number;
   initialPeekDurationMs?: number;
   powerRevealDurationMs?: number;
+  flipRevealDurationMs?: number;
   lossThreshold?: number;
   minPlayers?: number;
   maxPlayers?: number;
@@ -26,6 +27,7 @@ const SCALAR_KEYS = [
   'initialRevealCount',
   'initialPeekDurationMs',
   'powerRevealDurationMs',
+  'flipRevealDurationMs',
   'lossThreshold',
   'minPlayers',
   'maxPlayers',

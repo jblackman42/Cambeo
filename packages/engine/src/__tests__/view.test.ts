@@ -261,3 +261,58 @@ describe('view', () => {
     }
   });
 });
+
+describe('view identity invariant', () => {
+  it('rejects any event carrying a face key outside a reveal for the viewer', () => {
+    const state = startPlaying();
+    const view = viewFor(state, P1, HOUSE_RULES);
+
+    // A hand card named by a public event is the leak class this guard exists to catch.
+    const hidden = state.players[P2]!.hand[0]!;
+    expect(() =>
+      assertViewIdentityInvariant({
+        ...view,
+        lastEvents: [
+          {
+            type: 'FLIP_FAIL',
+            playerId: P1,
+            targetPlayerId: P2,
+            slotIndex: 0,
+            cardId: hidden,
+            key: 'K_BLACK',
+          } as never,
+        ],
+      }),
+    ).toThrow(/carried a face key/u);
+  });
+
+  it('allows a key for a card the view already makes public', () => {
+    const state = startStacked({
+      hands: {
+        p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: '5' }],
+      discard: [{ key: 'K_BLACK' }],
+    });
+    const view = viewFor(state, P1, HOUSE_RULES);
+    const top = view.discardTop!;
+    expect(() =>
+      assertViewIdentityInvariant({
+        ...view,
+        lastEvents: [
+          {
+            type: 'FLIP_SUCCESS',
+            playerId: P1,
+            targetPlayerId: P2,
+            slotIndex: 0,
+            cardId: top.id,
+            key: top.key,
+          } as never,
+        ],
+      }),
+    ).not.toThrow();
+  });
+});
+

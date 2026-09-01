@@ -56,7 +56,13 @@ function CountdownRing({ reveal }: { reveal: ActiveReveal }) {
 
 function RevealLift({ viewerId }: { viewerId: PlayerId }) {
   const { reveals } = useGame();
-  const lifted = reveals.filter((row) => row.kind === 'POWER');
+  // A power peek is one event, so it lifts once. A missed flip is revealed to every seat, so
+  // only the row addressed to this viewer is lifted — otherwise the same card stacks up N times.
+  const lifted = reveals.filter(
+    (row) =>
+      row.kind === 'POWER' ||
+      (row.kind === 'FLIP_FAIL' && row.revealedToPlayerId === viewerId),
+  );
   if (lifted.length === 0) return null;
 
   return (

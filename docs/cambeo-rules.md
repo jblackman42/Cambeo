@@ -58,9 +58,10 @@ Heaven usually reaches the discard pile only by accident: a player replaces a ca
 ## Setup
 
 1. Each player is dealt **4 cards**, face down. The host can raise this to as many as **6** in settings.
-2. Two of your cards are revealed to you, and only to you, at the start.
-3. **Memorize them.** Once play begins you cannot look at your own cards again unless a power lets you.
-4. The remaining deck sits face down in the middle, with a discard pile beside it.
+2. **Two** of your cards are revealed to you, and only to you, at the start. The host can change how many in settings, from none up to your whole hand.
+3. **Memorize them — you are on a clock.** The cards stay face up for **8 seconds** (host-configurable), with a countdown ring showing the time left. Tap **Got it** to flip them down early. Once they turn over that is it: the app will not show them to you again. Remembering is your job, not the game's.
+4. Once play begins you cannot look at your own cards again unless a power lets you.
+5. The remaining deck sits face down in the middle, with a discard pile beside it.
 
 ---
 
@@ -91,6 +92,10 @@ These are the defaults. All of them are editable before the game starts, and any
 | 10 | **Blind swap** — swap any two cards on the table, without looking at either |
 | J | **Look and swap** — look at any one other player's card, then swap any two cards on the table, without looking |
 
+**Every look is timed.** A power peek shows the card for **4 seconds** (host-configurable) with a
+countdown ring, then it turns face down again and the app forgets it. Everyone else sees the card
+lift with its back showing, so they know you looked and at whose card — but never what it was.
+
 You do not need to remember which cards have powers. The game prompts you when a power triggers and walks you through targeting it.
 
 ---
@@ -105,7 +110,7 @@ A flip is correct if the flipped card **matches the rank** of the top card on th
 
 - **Correct flip on your own card:** the card is discarded and you now have one fewer card. This is good.
 - **Correct flip on someone else's card:** their card is discarded, and you **must** give them a card from your own hand. You choose which. If you have zero cards, they instead draw a random card from the deck and do not get to see it.
-- **Incorrect flip:** you draw a penalty card and add it to your hand.
+- **Incorrect flip:** you draw a penalty card and add it to your hand. The card you guessed wrong on turns face up for **everyone** for a few seconds, then goes back into its owner's hand face down. That is the real cost of a bad flip: you have handed the whole table a free look, and they get the same few seconds to memorize it that you do.
 
 Constraints:
 
@@ -152,4 +157,6 @@ The game is over at that point. Start a new one to play again.
 - Powers only fire on cards drawn from the deck, never from the discard pile.
 - Flips match on rank only.
 - Flip fast, but a bad flip costs you a card, and more than 6 cards means you lose.
+- A missed flip turns the card face up for **everyone** for a few seconds, then it goes back into its owner's hand. Everyone at the table gets the same look, and the same few seconds to remember it.
+- Every look in this game is on a timer. The app never remembers a card for you.
 - After someone calls cambeo, they are untouchable and everyone else gets exactly one turn.

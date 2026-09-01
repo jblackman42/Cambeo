@@ -52,6 +52,7 @@ export const HOUSE_RULES: RuleSet = {
   initialRevealCount: 2,
   initialPeekDurationMs: 8000,
   powerRevealDurationMs: 4000,
+  flipRevealDurationMs: 2500,
   lossThreshold: 6,
   minPlayers: 3,
   maxPlayers: 8,

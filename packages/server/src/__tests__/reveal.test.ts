@@ -15,6 +15,7 @@ function revealEvents(msg: { lastEvents?: { type: string }[] } | { view?: { last
     revealedToPlayerId: string;
     kind: string;
     durationMs: number;
+    revealId?: string;
     expiresAt?: number;
     key?: string;
   }>;
@@ -99,5 +100,60 @@ describe('time-boxed reveals', () => {
     const other = revealEvents(h.lastOf('c3', 'state'));
     expect(actor.some((e) => e.key && e.kind === 'POWER')).toBe(true);
     expect(other.some((e) => e.kind === 'POWER' && e.key === undefined)).toBe(true);
+  });
+
+  it('stamps a distinct revealId on every delivered reveal', () => {
+    const h = createHarness();
+    h.join('c1', 'Alex');
+    h.join('c2', 'Blair');
+    h.join('c3', 'Casey');
+    h.send('c1', { type: 'start' });
+
+    const ids = revealEvents(h.lastOf('c1', 'state')).map((e) => e.revealId);
+    expect(ids.every((id) => typeof id === 'string' && id.length > 0)).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('a failed flip reveals to every seat and never survives into a snapshot', () => {
+    const h = createHarness();
+    h.join('c1', 'Alex');
+    h.join('c2', 'Blair');
+    h.join('c3', 'Casey');
+    h.send('c1', { type: 'start' });
+    h.send('c1', { type: 'action', action: { type: 'ACK_PEEK', playerId: 'p1' } });
+    h.send('c2', { type: 'action', action: { type: 'ACK_PEEK', playerId: 'p2' } });
+    h.send('c3', { type: 'action', action: { type: 'ACK_PEEK', playerId: 'p3' } });
+    h.send('c1', { type: 'action', action: { type: 'DRAW_DECK', playerId: 'p1' } });
+    h.send('c1', { type: 'action', action: { type: 'DISCARD_DRAWN', playerId: 'p1' } });
+    // Slot 3 is never one of the two initially peeked slots, so this is a blind guess and the
+    // engine's own match check decides. Either way no identity may outlive the reveal.
+    h.send('c2', {
+      type: 'action',
+      action: {
+        type: 'FLIP_ATTEMPT',
+        playerId: 'p2',
+        target: { playerId: 'p3', slotIndex: 3 },
+      },
+    });
+
+    const state = h.lastOf('c2', 'state');
+    expect(state?.lastEvents?.some((e) => e.type === 'FLIP_FAIL')).toBe(true);
+
+    // One reveal per seat, each carrying the face and each on the flip duration.
+    const flipReveals = revealEvents(state).filter((e) => e.kind === 'FLIP_FAIL');
+    expect(flipReveals).toHaveLength(3);
+    expect(flipReveals.every((e) => e.durationMs === HOUSE_RULES.flipRevealDurationMs)).toBe(true);
+    expect(
+      flipReveals.every((e) => e.expiresAt === h.clock.t + HOUSE_RULES.flipRevealDurationMs),
+    ).toBe(true);
+    // c2 is only entitled to the one addressed to p2.
+    expect(flipReveals.filter((e) => e.key !== undefined)).toHaveLength(1);
+    expect(flipReveals.find((e) => e.key !== undefined)?.revealedToPlayerId).toBe('p2');
+
+    h.disconnect('c2');
+    h.join('c2b', 'Blair', 'p2');
+    const snap = h.lastOf('c2b', 'snapshot');
+    expect(revealEvents(snap?.room).some((e) => e.key)).toBe(false);
+    expect(snap?.room.game?.players.p3?.hand.every((slot) => !slot.known)).toBe(true);
   });
 });

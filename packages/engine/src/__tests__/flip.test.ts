@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HOUSE_RULES } from '@cambeo/shared';
-import { viewFor } from '../index.js';
+import { assertViewIdentityInvariant, identitiesInView, viewFor } from '../index.js';
 import {
   apply,
   hasEvent,
@@ -393,3 +393,73 @@ describe('flip', () => {
     expect(reason && reason.type === 'ACTION_REJECTED' && reason.reason).not.toMatch(/give a card/i);
   });
 });
+
+describe('failed flip reveals', () => {
+  function missedFlip() {
+    let state = startStacked({
+      hands: {
+        p1: [{ key: '9' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p2: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+        p3: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
+      },
+      deck: [{ key: '5' }],
+      discard: [{ key: 'K_BLACK' }],
+    });
+    const cardId = state.players[P1]!.hand[0]!;
+    state = apply(state, {
+      type: 'FLIP_ATTEMPT',
+      playerId: P2,
+      target: { playerId: P1, slotIndex: 0 },
+    });
+    return { state, cardId };
+  }
+
+  it('FLIP_FAIL carries no identity — the card stays in the hand', () => {
+    const { state } = missedFlip();
+    const fail = state.lastEvents.find((e) => e.type === 'FLIP_FAIL');
+    expect(fail).toBeDefined();
+    expect('key' in (fail as object)).toBe(false);
+  });
+
+  it('the flipped card is revealed to every seat, on its own configured duration', () => {
+    const { state, cardId } = missedFlip();
+    const reveals = state.lastEvents.filter(
+      (e) => e.type === 'CARD_REVEALED' && e.kind === 'FLIP_FAIL',
+    );
+    expect(reveals).toHaveLength(state.seating.length);
+    for (const seat of state.seating) {
+      const mine = reveals.find(
+        (e) => e.type === 'CARD_REVEALED' && e.revealedToPlayerId === seat,
+      );
+      expect(mine?.type === 'CARD_REVEALED' && mine.cardId).toBe(cardId);
+      expect(mine?.type === 'CARD_REVEALED' && mine.key).toBe('9');
+      expect(mine?.type === 'CARD_REVEALED' && mine.durationMs).toBe(
+        HOUSE_RULES.flipRevealDurationMs,
+      );
+    }
+    // The card really is still in the hand — this is why it must expire.
+    expect(state.players[P1]!.hand[0]).toBe(cardId);
+  });
+
+  it('no view leaves the identity in a hand slot', () => {
+    const { state, cardId } = missedFlip();
+    for (const seat of state.seating) {
+      const view = viewFor(state, seat, HOUSE_RULES);
+      assertViewIdentityInvariant(view);
+      expect(view.players[P1]!.hand[0]!.known).toBe(false);
+      // The only identity channel is the reveal addressed to this seat.
+      expect(identitiesInView(view).has(cardId)).toBe(true);
+    }
+  });
+
+  it('the next action drops the identity from every view', () => {
+    const { state, cardId } = missedFlip();
+    const later = apply(state, { type: 'DRAW_DECK', playerId: P1 });
+    for (const seat of later.seating) {
+      const view = viewFor(later, seat, HOUSE_RULES);
+      assertViewIdentityInvariant(view);
+      expect(identitiesInView(view).has(cardId)).toBe(false);
+    }
+  });
+});
+

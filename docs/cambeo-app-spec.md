@@ -80,6 +80,7 @@ Note that card keys are split by color for **value and power** purposes only. Fl
 - Cards revealed to owner at start: 0 to hand size, default 2.
 - `initialPeekDurationMs`: how long the starting peek stays face up, default 8000. Tapping Got it hides them immediately.
 - `powerRevealDurationMs`: how long a power peek stays face up, default 4000.
+- `flipRevealDurationMs`: how long a missed flip shows the card to the whole table, default 2500.
 - Loss threshold (card count above which a player loses), default 6.
 - `heavenDiscardableAfterCambeo`: boolean, default `false`. When false, heaven cannot be discarded by any means during the final round after cambeo is called.
 - `hellDiscardOnlyOntoHeaven`: boolean, default `true`. When true, hell may only reach the discard pile via a correct flip onto heaven.
@@ -112,7 +113,7 @@ reduce(state: GameState, action: Action, ruleSet: RuleSet, rng: Rng): GameState
 - Owns the full authoritative state including every face-down card identity.
 - Emits an event list per action so the server can fan out redacted views and the client can animate.
 
-**Actions:** `DRAW_DECK`, `DRAW_DISCARD`, `DISCARD_DRAWN`, `REPLACE_CARD`, `KEEP_DRAWN`, `RESOLVE_POWER_TARGET`, `FLIP_ATTEMPT`, `GIVE_CARD`, `CALL_CAMBEO`, `PASS_TURN`.
+**Actions:** `START_GAME`, `ACK_PEEK`, `DRAW_DECK`, `DRAW_DISCARD`, `DISCARD_DRAWN`, `REPLACE_CARD`, `KEEP_DRAWN`, `RESOLVE_POWER_TARGET`, `FLIP_ATTEMPT`, `GIVE_CARD`, `CALL_CAMBEO`, `PASS_TURN`.
 
 `KEEP_DRAWN` adds the drawn card to the player's hand and ends the turn without putting anything on the discard pile. It is a normal third choice after drawing (alongside discard and replace), typically used to hold a late-game negative without giving up an existing card. It is also the only legal finish when heaven is drawn during the final round and cannot be discarded or replaced onto the pile.
 
@@ -153,6 +154,18 @@ Flipping is legal in every phase except `SCORING` and `OVER`, which is the main 
 - A 10 or J swap moves hell and is legal.
 - Engine invariant: hell never appears on the discard pile except immediately after a successful flip onto heaven.
 
+**Reveal test cases (see §5):**
+- A reveal expires and no later view carries the identity.
+- A snapshot requested after expiry does not contain the identity.
+- A reconnect after a reveal expires does not reissue it.
+- A reconnect *during* a reveal does not extend or reissue it.
+- Other players receive a lift notification with no `key` / `suit` / `value`.
+- Initial peek, power reveal, and missed flip each use their own configured duration.
+- A player holding a drawn card loses that identity once they discard, replace, or keep it.
+- `FLIP_FAIL` carries no identity; the flipped card is revealed to every seat and expires.
+- A second legitimate look at the same card starts its own timer; a replayed event does not.
+- Engine invariant: no view holds an identity outside an unexpired `CARD_REVEALED` addressed to the viewer, its held drawn card, the discard top, or final scoring — checked across *every* event type, not just `CARD_REVEALED`.
+
 ---
 
 ## 5. Multiplayer and State
@@ -169,13 +182,23 @@ A reveal is a time-boxed server-issued event, not a property of game state. The 
 
 The server emits a `CARD_REVEALED` event to exactly one player:
 
-`{ cardId, ownerId, slotIndex, revealedToPlayerId, kind, durationMs, expiresAt, key, suit, value }`
+`{ cardId, ownerId, slotIndex, revealedToPlayerId, kind, durationMs, revealId, expiresAt, key, suit, value }`
+
+`kind` is `INITIAL_PEEK`, `POWER`, or `FLIP_FAIL`. `revealId` is stamped by the server and is unique
+per emitted reveal; the client dedupes on it, so a replayed event can never extend a live reveal while
+a genuinely new look at the same card still starts its own timer.
 
 Everyone else receives the same event with `key` / `suit` / `value` omitted (a lift notification). The client renders the face until `expiresAt`, then deletes the identity from client state. The server never sends that identity to that player again — not on reconnect, not in a snapshot, not in a diff.
 
-Duration is server-authoritative (`expiresAt`). Configurable on the `RuleSet`: `initialPeekDurationMs` (default 8000) and `powerRevealDurationMs` (default 4000). The client also self-expires on its own clock as a backstop. If a player disconnects mid-reveal, the reveal is lost; it is not reissued.
+Duration is server-authoritative (`expiresAt`). Configurable on the `RuleSet`: `initialPeekDurationMs` (default 8000), `powerRevealDurationMs` (default 4000), and `flipRevealDurationMs` (default 2500). The client also self-expires on its own clock as a backstop. If a player disconnects mid-reveal, the reveal is lost; it is not reissued.
 
-What counts as a reveal (all expire): initial peek, `PEEK_OWN`, `PEEK_OTHER`, the look step of `LOOK_THEN_BLIND_SWAP`, both cards of `LOOK_THEN_OPTIONAL_SWAP`, and any future power that shows a face.
+What counts as a reveal (all expire): initial peek, `PEEK_OWN`, `PEEK_OTHER`, the look step of `LOOK_THEN_BLIND_SWAP`, both cards of `LOOK_THEN_OPTIONAL_SWAP`, a **missed flip**, and any future power that shows a face.
+
+A missed flip is the one reveal addressed to *every* seat rather than one: the card is exposed to the
+whole table and then returns to its owner's hand, so it must expire like any other. `FLIP_FAIL`
+therefore carries no `key` — the identity travels only in the accompanying `CARD_REVEALED`. A
+successful flip is different: that card lands on the discard pile and is public from then on, so
+`FLIP_SUCCESS` may name it.
 
 What is not a reveal: the card you just drew while deciding, the discard top, and the final scoring reveal.
 
@@ -265,7 +288,7 @@ For heaven and hell, use `red_joker.svg` for **heaven** and `black_joker.svg` fo
 
 Every card uses `viewBox="0 0 167.0869141 242.6669922"`, an aspect ratio of roughly **0.688** (2:2.9). Lock that ratio in CSS with `aspect-ratio` and let the SVG scale to fit.
 
-**Borders were stripped upstream.** The assets are face art on transparent background with no outline and no rounded corners. The app must render its own card frame: white fill, rounded corners, border, and shadow, with the art composited inside. This is convenient, since the frame is where the point-value badge and the "known to you" highlight live.
+**Borders were stripped upstream.** The assets are face art on transparent background with no outline and no rounded corners. The app must render its own card frame: white fill, rounded corners, border, and shadow, with the art composited inside. This is convenient, since the frame is where the point-value badge and the reveal treatment live — a rim light shown only while a reveal of that card is unexpired, never a persistent "you know this one" marker.
 
 **There is no card back in this repo.** One needs to be designed or sourced separately.
 
@@ -338,3 +361,6 @@ Do **not** inline the SVGs into the bundle. Do not load face cards lazily on fir
 ## 11. Still Open
 
 1. **"More than 6 cards and you lose"** versus "there are no eliminated players." Does a player who exceeds the threshold stop taking turns, or do they stay in play and simply lose at scoring? Play cannot continue meaningfully for a player who has already lost, so the engine needs one behavior or the other.
+2. **Clock skew on `expiresAt`.** The server stamps absolute Unix ms and the client self-expires on its own clock. A client whose clock is behind gets a longer look. Measuring an offset at join would fix it; whether that is worth the complexity is unresolved.
+3. **`LOOK_THEN_OPTIONAL_SWAP` after its reveals expire.** The confirm step is still answerable once the player has forgotten what they saw. That is arguably correct — the memory burden is the game — but it has not been ruled on.
+4. **Backgrounded tabs.** A reveal keeps expiring while the tab is hidden, so a player who tabs away loses the look. Consistent with the disconnect rule, but it has not been decided deliberately.

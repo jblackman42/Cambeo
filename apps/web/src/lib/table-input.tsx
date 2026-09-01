@@ -90,10 +90,20 @@ export function TableInputProvider({ children }: { children: ReactNode }) {
     if (!view) return;
     const fail = view.lastEvents.find((e) => e.type === 'FLIP_FAIL' && e.playerId === viewerId);
     if (fail && fail.type === 'FLIP_FAIL') {
-      const id = `${fail.cardId}:${fail.key}`;
-      if (seenPenalty.current !== id && view.discardTop) {
+      // FLIP_FAIL carries no identity. The face comes from the reveal that accompanies it,
+      // which the engine addresses to every seat and the server times out like any other.
+      const flipped = view.lastEvents.find(
+        (e) =>
+          e.type === 'CARD_REVEALED' &&
+          e.kind === 'FLIP_FAIL' &&
+          e.cardId === fail.cardId &&
+          e.revealedToPlayerId === viewerId,
+      );
+      const flippedKey = flipped?.type === 'CARD_REVEALED' ? flipped.key : undefined;
+      const id = `${fail.cardId}:${flippedKey ?? '?'}`;
+      if (seenPenalty.current !== id && view.discardTop && flippedKey) {
         seenPenalty.current = id;
-        setPenalty(flipPenaltyMessage(fail.key, view.discardTop.key));
+        setPenalty(flipPenaltyMessage(flippedKey, view.discardTop.key));
         haptic('fail');
         playSound('flip-fail');
       }

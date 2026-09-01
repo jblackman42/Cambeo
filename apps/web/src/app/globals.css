@@ -572,16 +572,6 @@ button {
   margin-right: 0.35rem;
 }
 
-.flip-confirm {
-  background: var(--surface-2);
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  padding: 0.75rem 0.85rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
 .event-log {
   max-height: 88px;
   overflow-y: auto;
@@ -955,6 +945,18 @@ button {
   to {
     transform: none;
     opacity: 1;
+  }
+}
+
+/* Scoring reveal. There is no 3-D flip anywhere in this app: faces cross-fade and settle. */
+@keyframes score-flip {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

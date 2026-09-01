@@ -54,14 +54,6 @@ export function GameProvider({
     setReveals((rows) => ingestReveals(rows, state.lastEvents, Date.now()));
   }, [state]);
 
-  useEffect(() => {
-    if (!state) {
-      setReveals([]);
-      return;
-    }
-    setReveals((rows) => ingestReveals(rows, state.lastEvents, Date.now()));
-  }, [state]);
-
   const resetLobby = useCallback(
     (playerNames: string[]) => {
       const { ids, nameMap } = makeIds(playerNames);

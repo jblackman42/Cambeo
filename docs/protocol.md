@@ -39,7 +39,21 @@ Room codes are 5 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 
 `RoomView.ruleSet` is the room’s current config (lobby and in-game). Every `state` / `snapshot.game` is redacted for that player. Hand slots never include face identity during play (`known: false`, no `key`). Drawn-card identity is only on the drawer’s view. Discard top is public. Final scoring reveals all hands.
 
-A `CARD_REVEALED` identity is delivered **once**, on the `state` message after the reduce that created it, and only to the addressed player (with `expiresAt` stamped by the server). Other players get the same event with no `key`. Snapshots and reconnects never reissue a reveal, even if it has not yet expired.
+A `CARD_REVEALED` identity is delivered **once**, on the `state` message after the reduce that created it, and only to the addressed player (with `revealId` and `expiresAt` stamped by the server). Other players get the same event with no `key` / `suit` / `value`. Snapshots and reconnects never reissue a reveal, even if it has not yet expired.
+
+| `CARD_REVEALED` field | Meaning |
+| --- | --- |
+| `cardId`, `ownerId`, `slotIndex` | Which slot lifted. Sent to everyone. |
+| `revealedToPlayerId` | Who this copy is addressed to. Only that player's copy carries a face. |
+| `kind` | `INITIAL_PEEK`, `POWER`, or `FLIP_FAIL` |
+| `durationMs` | From the `RuleSet`, per `kind` |
+| `revealId` | Server-stamped, unique per emitted reveal. The client dedupes on it. |
+| `expiresAt` | Server-stamped Unix ms. Authoritative; the client also self-expires as a backstop. |
+| `key`, `suit`, `value` | The face. Present **only** on the addressed player's copy. |
+
+A missed flip emits one `CARD_REVEALED` per seat, since the card is exposed to the whole table and
+then returns to its owner's hand. `FLIP_FAIL` itself carries no `key`. `FLIP_SUCCESS` does, because
+that card lands on the public discard pile.
 
 ## Flip race
 

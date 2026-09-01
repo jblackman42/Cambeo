@@ -1,7 +1,18 @@
 import { cardValue, type GameEvent, type RuleSet } from '@cambeo/shared';
 import type { CardId, GameState, PlayerId } from './state.js';
 
-export type RevealKind = 'INITIAL_PEEK' | 'POWER';
+export type RevealKind = 'INITIAL_PEEK' | 'POWER' | 'FLIP_FAIL';
+
+function revealDurationMs(ruleSet: RuleSet, kind: RevealKind): number {
+  switch (kind) {
+    case 'INITIAL_PEEK':
+      return ruleSet.initialPeekDurationMs;
+    case 'FLIP_FAIL':
+      return ruleSet.flipRevealDurationMs;
+    default:
+      return ruleSet.powerRevealDurationMs;
+  }
+}
 
 export function cardRevealedEvent(
   state: GameState,
@@ -23,8 +34,7 @@ export function cardRevealedEvent(
     slotIndex: args.slotIndex,
     revealedToPlayerId: args.revealedToPlayerId,
     kind: args.kind,
-    durationMs:
-      args.kind === 'INITIAL_PEEK' ? ruleSet.initialPeekDurationMs : ruleSet.powerRevealDurationMs,
+    durationMs: revealDurationMs(ruleSet, args.kind),
     key: card.key,
     suit: card.suit,
     value: cardValue(ruleSet, card.key),

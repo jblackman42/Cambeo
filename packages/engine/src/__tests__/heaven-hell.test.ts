@@ -13,7 +13,7 @@ import {
 } from '../testkit.js';
 
 describe('heaven and hell', () => {
-  it('drawing hell from the deck offers replace only; DISCARD_DRAWN is rejected', () => {
+  it('drawing hell from the deck offers replace or keep; DISCARD_DRAWN is rejected', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],
@@ -27,6 +27,13 @@ describe('heaven and hell', () => {
     expect(state.cards[state.drawnCard!]!.key).toBe('HELL');
     const discardAttempt = apply(state, { type: 'DISCARD_DRAWN', playerId: P1 });
     expect(rejected(discardAttempt)).toBe(true);
+    // Keep never touches the discard pile, so the hell restriction does not reach it.
+    const kept = apply(state, { type: 'KEEP_DRAWN', playerId: P1 });
+    expect(rejected(kept)).toBe(false);
+    expect(kept.players[P1]!.hand.some((id) => kept.cards[id]!.key === 'HELL')).toBe(true);
+    expect(kept.players[P1]!.hand).toHaveLength(5);
+    expect(kept.discard.every((id) => kept.cards[id]!.key !== 'HELL')).toBe(true);
+
     state = apply(state, { type: 'REPLACE_CARD', playerId: P1, slotIndex: 0 });
     expect(rejected(state)).toBe(false);
     expect(state.players[P1]!.hand.some((id) => state.cards[id]!.key === 'HELL')).toBe(true);

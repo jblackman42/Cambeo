@@ -143,7 +143,7 @@ Flipping is legal in every phase except `SCORING` and `OVER`, which is the main 
 - Deck runs out mid-draw and the discard pile is reshuffled into it.
 - Deck runs out with an empty or single-card discard pile.
 - Tie between the caller and another player resolves in favor of the non-caller.
-- Drawing hell from the deck offers replace only; `DISCARD_DRAWN` is rejected.
+- Drawing hell from the deck offers replace and keep; `DISCARD_DRAWN` is rejected.
 - Drawing hell from the discard pile is impossible, since hell can only reach the discard pile via a flip onto heaven, and a flip removes it.
 - Flipping hell onto a discarded heaven succeeds.
 - Flipping hell onto any non-joker top discard fails and takes the wrong-flip penalty.
@@ -198,7 +198,7 @@ Look and motion are specified in [`cambeo-design.md`](cambeo-design.md). That do
 - Sound or haptic cue on a successful flip against you, since flips happen off-turn and are easy to miss.
 - Event log so a player who looked away can catch up.
 - After drawing, the prompt offers discard, replace, and keep. Keep adds the card to the hand without touching the discard pile.
-- When a player draws hell, the prompt must show only replace, with a short explanation of why. Do not present a disabled discard button with no reason. If the hand is empty (nothing to replace), show keep instead.
+- When a player draws hell, the prompt must offer replace and keep, with a short explanation of why discard is missing. Do not present a disabled discard button with no reason. If the hand is empty (nothing to replace), keep is the only option.
 - Same for heaven during the final round: show only the legal options (`KEEP_DRAWN`, and replace only if that would not put heaven on the pile — under House Rules, replace is also illegal, so keep-only with explanation).
 - Heaven sitting on top of the discard pile is a high-signal game state. Give it a visible treatment so nobody misses the flip window for hell.
 
@@ -323,7 +323,7 @@ Do **not** inline the SVGs into the bundle. Do not load face cards lazily on fir
 - Flip matching is by **rank only**. A black Q flips onto a red Q. Heaven and hell share the joker match key, so hell flips successfully onto heaven.
 - Heaven and hell are shuffled into the deck and can be dealt and drawn like any other card.
 - Heaven may be discarded normally until cambeo is called. After cambeo, heaven cannot be discarded by any means during the final round (config: `heavenDiscardableAfterCambeo`, House Rules default `false`). Swaps may still move heaven.
-- Hell may never be discarded except by a correct flip onto heaven (config: `hellDiscardOnlyOntoHeaven`, House Rules default `true`). Drawing hell from the deck allows replace only, not discard-for-power. Swaps may still move hell.
+- Hell may never be discarded except by a correct flip onto heaven (config: `hellDiscardOnlyOntoHeaven`, House Rules default `true`). Drawing hell from the deck allows replace or `KEEP_DRAWN`, but not discard-for-power. Swaps may still move hell.
 - After drawing, a player may discard, replace a card, or `KEEP_DRAWN` (add the card to hand, put nothing on discard).
 - A player who draws heaven during the final round must `KEEP_DRAWN` if they cannot legally put heaven on the pile.
 - When the deck runs out, the discard pile is shuffled and becomes the new deck.

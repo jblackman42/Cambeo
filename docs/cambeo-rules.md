@@ -47,7 +47,7 @@ Every value in this table is editable in the game settings before a game begins.
 - Hell can never be discarded, with exactly one exception.
 - The only legal way to discard hell is to place it on top of heaven on the discard pile. Since flip matching is by rank, this is a normal correct flip: both cards are jokers.
 - Hell can still be moved by a 10 or a J swap at any time. Swapping is not discarding.
-- Because hell cannot be discarded, it also cannot be discarded to use a power. If a player draws hell from the deck, their only legal move is to replace one of their own cards with it.
+- Because hell cannot be discarded, it also cannot be discarded to use a power. A player who draws hell from the deck may replace one of their own cards with it, or keep it as an extra card. Keeping puts nothing on the discard pile, so the discard restriction does not reach it.
 
 ### Why this matters in play
 

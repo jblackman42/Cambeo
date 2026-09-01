@@ -336,13 +336,13 @@ export function PromptBar() {
         <div className="prompt-bar">
           {extras}
           <p className="prompt-kicker">Hell</p>
-          <p className="prompt-title">{canReplace ? 'Replace only' : 'Keep it'}</p>
+          <p className="prompt-title">{canReplace ? 'Replace or keep?' : 'Keep it'}</p>
           <p className="prompt-hint">
             {canReplace
-              ? 'Hell cannot be discarded except by flipping it onto heaven. Tap one of your cards to replace it.'
+              ? 'Hell cannot be discarded except by flipping it onto heaven. Tap one of your cards to replace it, or keep it as an extra card.'
               : 'Hell cannot be discarded except by flipping it onto heaven. You have no cards to replace, so keep it to end your turn.'}
           </p>
-          <div className="btn-row">{canReplace ? null : keep('Keep', true)}</div>
+          <div className="btn-row">{keep('Keep', !canReplace)}</div>
         </div>
       );
     }

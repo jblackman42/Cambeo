@@ -70,7 +70,8 @@ Heaven usually reaches the discard pile only by accident: a player replaces a ca
 On your turn:
 
 1. **Draw** one card, either from the top of the deck or from the top of the discard pile.
-2. Then choose one:
+2. **Look at it while you can.** The drawn card is shown to you, and only to you, for **5 seconds** (host-configurable), with the same countdown ring as any other look. Then it turns face down in front of you. You still finish your turn — you just finish it from memory. No card in this game sits face up waiting for you.
+3. Then choose one:
    - **Discard it to use its power.** The card goes to the discard pile and its power resolves immediately.
    - **Replace one of your own cards with it.** Your old card goes face up on the discard pile. Nothing triggers.
    - **Keep it.** The card is added to your hand. Nothing goes on the discard pile, and no power fires. Typical late-game use: you draw a negative while already holding only negatives, and you do not want to give one up.
@@ -154,6 +155,7 @@ The game is over at that point. Start a new one to play again.
 - Hell can only ever be discarded by flipping it onto heaven.
 - Black face cards and 10s are 10 points each.
 - After drawing you may discard (for power), replace a card, or keep the draw as an extra card.
+- The card you drew is yours to see for a few seconds, then it turns down like everything else. If it cannot legally be discarded the app still tells you so — it just stops naming the card.
 - Powers only fire on cards drawn from the deck, never from the discard pile.
 - Flips match on rank only.
 - Flip fast, but a bad flip costs you a card, and more than 6 cards means you lose.

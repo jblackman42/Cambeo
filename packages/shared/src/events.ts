@@ -25,9 +25,10 @@ export type GameEvent =
       type: 'CARD_REVEALED';
       cardId: CardId;
       ownerId: PlayerId;
+      /** Index in the owner's hand, or -1 for a card that is not in a hand (a `DRAW` reveal). */
       slotIndex: number;
       revealedToPlayerId: PlayerId;
-      kind: 'INITIAL_PEEK' | 'POWER' | 'FLIP_FAIL';
+      kind: 'INITIAL_PEEK' | 'POWER' | 'FLIP_FAIL' | 'DRAW';
       durationMs: number;
       /**
        * Unique per emitted reveal. Stamped by the room server; absent on raw engine events.

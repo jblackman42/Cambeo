@@ -15,7 +15,7 @@ If engine code and the rules doc disagree, the rules doc wins. Do not invent rul
 Violating either of these is a failed change:
 
 1. **No hardcoded rules.** No card value, point total, power assignment, hand size, or player minimum may be hardcoded outside the `RuleSet`. Everything reads from config. If you find yourself typing `10` next to a letter `J`, stop.
-2. **Redaction is first-class.** The engine must produce a redacted per-player view. A client receives a card identity only inside an unexpired `CARD_REVEALED` event addressed to it, or in the final scoring reveal, or for a card it is currently holding after drawing. The engine keeps no per-player knowledge set. Use `viewFor(state, playerId, ruleSet)` and `assertViewIdentityInvariant(view)`.
+2. **Redaction is first-class.** The engine must produce a redacted per-player view. A client receives a card identity only inside an unexpired `CARD_REVEALED` event addressed to it, or in the final scoring reveal. That includes the card the player just drew: `drawnCard` is `{ id }` only, and its face travels in a `DRAW` reveal that expires like every other look. The engine keeps no per-player knowledge set. Use `viewFor(state, playerId, ruleSet)` and `assertViewIdentityInvariant(view)`.
 
 Also: `Math.random` is banned in `packages/engine` and `packages/shared` (ESLint). Use the seeded `Rng`.
 

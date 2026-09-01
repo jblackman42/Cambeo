@@ -2,14 +2,22 @@
 
 import type { Action, PlayerId } from '@cambeo/engine';
 import { createGame, createRng, reduce, viewFor } from '@cambeo/engine';
-import { HOUSE_RULES, cloneRuleSet, type RedactedGameView, type RuleSet } from '@cambeo/shared';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  HOUSE_RULES,
+  cloneRuleSet,
+  type GameEvent,
+  type RedactedGameView,
+  type RuleSet,
+} from '@cambeo/shared';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PlayProvider, deriveMode, type InteractionMode, type PlayStore } from '@/lib/play-context';
 import {
   dismissInitialPeeks as dropInitialPeeks,
   expireReveals,
   ingestReveals,
+  initialPeekEventsFor,
   nextExpiryAt,
+  withoutForeignInitialPeeks,
   type ActiveReveal,
 } from '@/lib/reveals';
 
@@ -46,13 +54,46 @@ export function GameProvider({
     return () => window.clearTimeout(t);
   }, [reveals]);
 
+  // Hot-seat passes one device around, so the seats do not all look at once. The deal's peek
+  // batch is held here and armed one seat at a time, on first selection — and only once, so
+  // hopping back to a seat cannot buy a second look at cards you already spent your clock on.
+  const peekBatch = useRef<GameEvent[]>([]);
+  const armedPeekSeats = useRef<Set<PlayerId>>(new Set());
+  const viewerRef = useRef(viewerId);
+  viewerRef.current = viewerId;
+
   useEffect(() => {
     if (!state) {
       setReveals([]);
+      peekBatch.current = [];
+      armedPeekSeats.current = new Set();
       return;
     }
-    setReveals((rows) => ingestReveals(rows, state.lastEvents, Date.now()));
+    const dealt = state.lastEvents.filter(
+      (event) => event.type === 'CARD_REVEALED' && event.kind === 'INITIAL_PEEK',
+    );
+    if (dealt.length > 0) {
+      peekBatch.current = dealt;
+      armedPeekSeats.current = new Set([viewerRef.current]);
+    }
+    setReveals((rows) =>
+      ingestReveals(
+        rows,
+        withoutForeignInitialPeeks(state.lastEvents, viewerRef.current),
+        Date.now(),
+      ),
+    );
   }, [state]);
+
+  useEffect(() => {
+    if (!state || state.phase !== 'INITIAL_PEEK') return;
+    if (state.ackedPeek.includes(viewerId)) return;
+    if (armedPeekSeats.current.has(viewerId)) return;
+    const own = initialPeekEventsFor(peekBatch.current, viewerId);
+    if (own.length === 0) return;
+    armedPeekSeats.current.add(viewerId);
+    setReveals((rows) => ingestReveals(rows, own, Date.now()));
+  }, [state, viewerId]);
 
   const resetLobby = useCallback(
     (playerNames: string[]) => {

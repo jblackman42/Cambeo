@@ -57,6 +57,7 @@ function view(overrides: Partial<RedactedGameView> = {}): RedactedGameView {
     discardCount: 1,
     turn: { playerId: OPP, hasDrawn: false, drawnFrom: null },
     drawnCard: null,
+    drawnOptions: null,
     pendingPower: null,
     pendingGive: null,
     cambeoCallerId: null,

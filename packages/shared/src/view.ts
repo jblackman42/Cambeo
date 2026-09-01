@@ -31,6 +31,26 @@ export interface KnownCardView {
 
 export type SlotView = HiddenCardView | KnownCardView;
 
+/** A card held mid-turn. Carries no identity: the face travels in the draw reveal. */
+export interface HeldCardView {
+  id: CardId;
+}
+
+/**
+ * Legal finishes for the held card, so the client can offer the right buttons without
+ * reading the drawn card's key.
+ */
+export interface DrawnOptionsView {
+  /** `DISCARD_DRAWN` is legal (hell, and heaven after cambeo, are blocked). */
+  canDiscard: boolean;
+  /** At least one held card could legally go on the pile, so `REPLACE_CARD` has a target. */
+  canReplace: boolean;
+  /** `KEEP_DRAWN` is legal. Always true mid-turn; present so the shape reads as a full set. */
+  canKeep: boolean;
+  /** The draw fired from the discard pile, so discarding it can never trigger a power. */
+  fromDiscard: boolean;
+}
+
 export interface PlayerView {
   id: PlayerId;
   hand: SlotView[];
@@ -69,8 +89,17 @@ export interface RedactedGameView {
     hasDrawn: boolean;
     drawnFrom: 'DECK' | 'DISCARD' | null;
   } | null;
-  /** Drawn card is only visible to the drawing player. */
-  drawnCard: PublicCardView | null;
+  /**
+   * The card the current player is holding mid-turn, identity-free. Its face travels only in the
+   * time-boxed `CARD_REVEALED{kind:'DRAW'}` issued when it was drawn, like every other reveal.
+   * Present only in the drawing player's own view.
+   */
+  drawnCard: HeldCardView | null;
+  /**
+   * Which finishes are legal for the held card. The engine computes this because the client can
+   * no longer read the drawn key once the draw reveal expires.
+   */
+  drawnOptions: DrawnOptionsView | null;
   pendingPower: PendingPowerView | null;
   pendingGive: PendingGiveView | null;
   cambeoCallerId: PlayerId | null;

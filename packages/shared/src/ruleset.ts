@@ -23,6 +23,7 @@ export const RuleSetSchema = z
     initialPeekDurationMs: z.number().int().positive(),
     powerRevealDurationMs: z.number().int().positive(),
     flipRevealDurationMs: z.number().int().positive(),
+    drawRevealDurationMs: z.number().int().positive(),
     lossThreshold: z.number().int().min(1),
     minPlayers: z.number().int().min(2),
     maxPlayers: z.number().int().min(2),

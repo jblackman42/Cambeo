@@ -81,6 +81,7 @@ Note that card keys are split by color for **value and power** purposes only. Fl
 - `initialPeekDurationMs`: how long the starting peek stays face up, default 8000. Tapping Got it hides them immediately.
 - `powerRevealDurationMs`: how long a power peek stays face up, default 4000.
 - `flipRevealDurationMs`: how long a missed flip shows the card to the whole table, default 2500.
+- `drawRevealDurationMs`: how long the card you just drew stays face up for you, default 5000. After that it turns down and the turn is finished from memory.
 - Loss threshold (card count above which a player loses), default 6.
 - `heavenDiscardableAfterCambeo`: boolean, default `false`. When false, heaven cannot be discarded by any means during the final round after cambeo is called.
 - `hellDiscardOnlyOntoHeaven`: boolean, default `true`. When true, hell may only reach the discard pile via a correct flip onto heaven.
@@ -160,11 +161,12 @@ Flipping is legal in every phase except `SCORING` and `OVER`, which is the main 
 - A reconnect after a reveal expires does not reissue it.
 - A reconnect *during* a reveal does not extend or reissue it.
 - Other players receive a lift notification with no `key` / `suit` / `value`.
-- Initial peek, power reveal, and missed flip each use their own configured duration.
-- A player holding a drawn card loses that identity once they discard, replace, or keep it.
+- Initial peek, power reveal, missed flip, and the draw each use their own configured duration.
+- A player holding a drawn card loses that identity when the draw reveal expires, and the view never carried it in the first place.
+- `drawnOptions` reports legality (`canDiscard` / `canReplace` / `canKeep` / `fromDiscard`) without naming the held card, so the turn stays playable after the draw reveal expires.
 - `FLIP_FAIL` carries no identity; the flipped card is revealed to every seat and expires.
 - A second legitimate look at the same card starts its own timer; a replayed event does not.
-- Engine invariant: no view holds an identity outside an unexpired `CARD_REVEALED` addressed to the viewer, its held drawn card, the discard top, or final scoring — checked across *every* event type, not just `CARD_REVEALED`.
+- Engine invariant: no view holds an identity outside an unexpired `CARD_REVEALED` addressed to the viewer, the discard top, or final scoring — checked across *every* event type, not just `CARD_REVEALED`, and including `drawnCard` itself.
 
 ---
 
@@ -176,7 +178,7 @@ Flipping is legal in every phase except `SCORING` and `OVER`, which is the main 
 - Hand slots: position and count only. Never identity, including your own cards.
 - Discard pile top: public.
 - Deck: count only.
-- Drawn card: identity only for the player currently holding it, and only until they discard, replace, or keep it.
+- Drawn card: `drawnCard` is `{ id }` only, even for the holder. The face travels in the draw reveal and expires with it; `drawnOptions` carries the legality the client would otherwise read off the key.
 
 A reveal is a time-boxed server-issued event, not a property of game state. The engine keeps no per-player knowledge set. Knowledge lives in the player's head.
 
@@ -184,15 +186,16 @@ The server emits a `CARD_REVEALED` event to exactly one player:
 
 `{ cardId, ownerId, slotIndex, revealedToPlayerId, kind, durationMs, revealId, expiresAt, key, suit, value }`
 
-`kind` is `INITIAL_PEEK`, `POWER`, or `FLIP_FAIL`. `revealId` is stamped by the server and is unique
+`kind` is `INITIAL_PEEK`, `POWER`, `FLIP_FAIL`, or `DRAW`. A `DRAW` reveal is for a card in no one's
+hand, so it carries `slotIndex: -1`. `revealId` is stamped by the server and is unique
 per emitted reveal; the client dedupes on it, so a replayed event can never extend a live reveal while
 a genuinely new look at the same card still starts its own timer.
 
 Everyone else receives the same event with `key` / `suit` / `value` omitted (a lift notification). The client renders the face until `expiresAt`, then deletes the identity from client state. The server never sends that identity to that player again — not on reconnect, not in a snapshot, not in a diff.
 
-Duration is server-authoritative (`expiresAt`). Configurable on the `RuleSet`: `initialPeekDurationMs` (default 8000), `powerRevealDurationMs` (default 4000), and `flipRevealDurationMs` (default 2500). The client also self-expires on its own clock as a backstop. If a player disconnects mid-reveal, the reveal is lost; it is not reissued.
+Duration is server-authoritative (`expiresAt`). Configurable on the `RuleSet`: `initialPeekDurationMs` (default 8000), `powerRevealDurationMs` (default 4000), `flipRevealDurationMs` (default 2500), and `drawRevealDurationMs` (default 5000). The client also self-expires on its own clock as a backstop. If a player disconnects mid-reveal, the reveal is lost; it is not reissued.
 
-What counts as a reveal (all expire): initial peek, `PEEK_OWN`, `PEEK_OTHER`, the look step of `LOOK_THEN_BLIND_SWAP`, both cards of `LOOK_THEN_OPTIONAL_SWAP`, a **missed flip**, and any future power that shows a face.
+What counts as a reveal (all expire): initial peek, **the card you just drew**, `PEEK_OWN`, `PEEK_OTHER`, the look step of `LOOK_THEN_BLIND_SWAP`, both cards of `LOOK_THEN_OPTIONAL_SWAP`, a **missed flip**, and any future power that shows a face.
 
 A missed flip is the one reveal addressed to *every* seat rather than one: the card is exposed to the
 whole table and then returns to its owner's hand, so it must expire like any other. `FLIP_FAIL`
@@ -200,9 +203,15 @@ therefore carries no `key` — the identity travels only in the accompanying `CA
 successful flip is different: that card lands on the discard pile and is public from then on, so
 `FLIP_SUCCESS` may name it.
 
-What is not a reveal: the card you just drew while deciding, the discard top, and the final scoring reveal.
+The drawn card is a reveal like any other: shown to the drawer alone, on `drawRevealDurationMs`, and
+never reissued. The choice that follows is made from memory. Because the client can no longer read the
+key, the view carries `drawnOptions` — booleans about what is legal, never about what the card is. The
+prompt may name the card while its reveal is live; once it expires the prompt goes neutral and says
+only what the player may do.
 
-Engine invariant: no client view ever holds an identity outside an unexpired `CARD_REVEALED` addressed to it, its held drawn card, the discard top, or final scoring.
+What is not a reveal: the discard top and the final scoring reveal.
+
+Engine invariant: no client view ever holds an identity outside an unexpired `CARD_REVEALED` addressed to it, the discard top, or final scoring.
 
 **Flip race resolution:** flips arrive as messages, are ordered by server arrival, and the first valid attempt against a given discard wins. All later attempts against that same discard are rejected. Start there. If latency turns out to be unfair, add a 250ms collection window resolved by client timestamp with a clock offset measured at join.
 
@@ -221,7 +230,9 @@ Look and motion are specified in [`cambeo-design.md`](cambeo-design.md). That do
 - Sound or haptic cue on a successful flip against you, since flips happen off-turn and are easy to miss.
 - Event log so a player who looked away can catch up.
 - After drawing, the prompt offers discard, replace, and keep. Keep adds the card to the hand without touching the discard pile.
+- The drawn card is face up only while its draw reveal is unexpired, then it settles face down in the Drawn slot with the rest of the turn still to play. The countdown ring is the same one every other reveal uses.
 - When a player draws hell, the prompt must offer replace and keep, with a short explanation of why discard is missing. Do not present a disabled discard button with no reason. If the hand is empty (nothing to replace), keep is the only option.
+- The prompt may name hell or heaven only while the draw reveal is live. Once it expires the copy goes neutral — it states what is legal ("this one cannot go on the discard pile") without naming the card the app has just turned face down. Legality itself always stays visible; a turn must never be unplayable.
 - Same for heaven during the final round: show only the legal options (`KEEP_DRAWN`, and replace only if that would not put heaven on the pile — under House Rules, replace is also illegal, so keep-only with explanation).
 - Heaven sitting on top of the discard pile is a high-signal game state. Give it a visible treatment so nobody misses the flip window for hell.
 

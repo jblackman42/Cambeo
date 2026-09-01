@@ -9,6 +9,27 @@ import { beginPower } from './powers.js';
 import { maybeFlagLossThreshold } from './scoring.js';
 import { specialCardHooks } from './extensions/heavenHell.js';
 import { assertHellDiscardInvariant, canPlaceOnDiscard } from './jokers.js';
+import { NO_SLOT, cardRevealedEvent } from './reveal.js';
+
+/**
+ * The look a player gets at the card they just drew. It is a reveal like any other: time-boxed,
+ * addressed to one seat, and never reissued. Nothing else carries the drawn identity, so once
+ * this expires the choice is made from memory.
+ */
+function drawRevealEvent(
+  state: GameState,
+  ruleSet: RuleSet,
+  playerId: PlayerId,
+  cardId: CardId,
+): GameEvent {
+  return cardRevealedEvent(state, ruleSet, {
+    revealedToPlayerId: playerId,
+    ownerId: playerId,
+    slotIndex: NO_SLOT,
+    cardId,
+    kind: 'DRAW',
+  });
+}
 
 /**
  * Draw from deck. If deck is empty, reshuffle discard (keeping top) into deck.
@@ -74,7 +95,7 @@ export function drawFromDeck(
 export function drawDeck(
   state: GameState,
   action: Extract<Action, { type: 'DRAW_DECK' }>,
-  _ruleSet: RuleSet,
+  ruleSet: RuleSet,
   rng: Rng,
 ): GameState {
   if (state.phase === 'GIVE_CARD_PENDING') {
@@ -99,6 +120,7 @@ export function drawDeck(
   const events: GameEvent[] = [
     ...drawn.events,
     { type: 'CARD_DRAWN', playerId: action.playerId, from: 'DECK', cardId: drawn.cardId },
+    drawRevealEvent(state, ruleSet, action.playerId, drawn.cardId),
     { type: 'PHASE_CHANGED', from: state.phase, to: 'TURN_CHOICE' },
   ];
 
@@ -115,7 +137,7 @@ export function drawDeck(
 export function drawDiscard(
   state: GameState,
   action: Extract<Action, { type: 'DRAW_DISCARD' }>,
-  _ruleSet: RuleSet,
+  ruleSet: RuleSet,
   rng: Rng,
 ): GameState {
   if (state.phase === 'GIVE_CARD_PENDING') {
@@ -138,6 +160,7 @@ export function drawDiscard(
   const discard = state.discard.slice(0, -1);
   const events: GameEvent[] = [
     { type: 'CARD_DRAWN', playerId: action.playerId, from: 'DISCARD', cardId },
+    drawRevealEvent(state, ruleSet, action.playerId, cardId),
     { type: 'PHASE_CHANGED', from: state.phase, to: 'TURN_CHOICE' },
   ];
 
@@ -324,15 +347,8 @@ export function keepDrawn(
   }
 
   const cardId = state.drawnCard;
-  const added = addCardToHand(
-    { ...state, drawnCard: null },
-    action.playerId,
-    cardId,
-    ruleSet,
-  );
-  const events: GameEvent[] = [
-    { type: 'CARD_KEPT', playerId: action.playerId, cardId },
-  ];
+  const added = addCardToHand({ ...state, drawnCard: null }, action.playerId, cardId, ruleSet);
+  const events: GameEvent[] = [{ type: 'CARD_KEPT', playerId: action.playerId, cardId }];
   if (added.thresholdEvent) events.push(added.thresholdEvent);
 
   const next: GameState = {

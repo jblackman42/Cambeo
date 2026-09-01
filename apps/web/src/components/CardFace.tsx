@@ -17,12 +17,24 @@ type CardProps = {
   ambient?: 'heaven' | 'hell' | null;
   disabled?: boolean;
   asButton?: boolean;
+  /** The face is on its way out: its reveal has expired and it is fading back to the card back. */
+  hiding?: boolean;
 };
 
-function CardArtImg({ src, srcSet, known }: { src: string; srcSet?: string; known: boolean }) {
+function CardArtImg({
+  src,
+  srcSet,
+  known,
+  back = false,
+}: {
+  src: string;
+  srcSet?: string;
+  known: boolean;
+  back?: boolean;
+}) {
   return (
     <img
-      className="card-art"
+      className={back ? 'card-art card-back-art' : 'card-art'}
       src={src}
       srcSet={srcSet}
       alt=""
@@ -47,6 +59,7 @@ export function CardFace({
   ambient = null,
   disabled = false,
   asButton = true,
+  hiding = false,
 }: CardProps) {
   const known = face ? true : slot ? slot.known : false;
   const key = face?.key ?? (slot && slot.known ? slot.key : null);
@@ -56,24 +69,25 @@ export function CardFace({
 
   const jokerName = key === 'HEAVEN' ? 'Heaven' : key === 'HELL' ? 'Hell' : null;
 
-  const content =
-    art ? (
-      <>
-        <CardArtImg {...art} known />
-        {jokerName && <span className="card-joker-name">{jokerName}</span>}
-        {value !== null && (
-          <span className="card-value" data-negative={value < 0 ? 'true' : 'false'}>
-            {value < 0 ? formatPoints(value) : String(value)}
-          </span>
-        )}
-        {armed && matchRank && <span className="card-match-rank">{matchRank}</span>}
-      </>
-    ) : (
-      <>
-        <CardArtImg {...cardBackAsset()} known={false} />
-        {armed && matchRank && <span className="card-match-rank">{matchRank}</span>}
-      </>
-    );
+  // The back is always mounted underneath, so a face can fade off it rather than being swapped
+  // out from under the player. Nothing here is a 3-D flip: the face cross-fades and settles.
+  const content = (
+    <>
+      <CardArtImg {...cardBackAsset()} known={false} back />
+      {art && (
+        <span className="card-face-layer" data-hiding={hiding ? 'true' : 'false'}>
+          <CardArtImg {...art} known />
+          {jokerName && <span className="card-joker-name">{jokerName}</span>}
+          {value !== null && (
+            <span className="card-value" data-negative={value < 0 ? 'true' : 'false'}>
+              {value < 0 ? formatPoints(value) : String(value)}
+            </span>
+          )}
+        </span>
+      )}
+      {armed && matchRank && <span className="card-match-rank">{matchRank}</span>}
+    </>
+  );
 
   const dataAttrs = {
     'data-known': known ? 'true' : 'false',

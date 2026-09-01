@@ -37,15 +37,15 @@ Room codes are 5 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 | `error` | Protocol / room errors (`ROOM_FULL`, `GAME_IN_PROGRESS`, `NOT_HOST`, `INVALID_RULES`, …) |
 | `pong` | Heartbeat reply |
 
-`RoomView.ruleSet` is the room’s current config (lobby and in-game). Every `state` / `snapshot.game` is redacted for that player. Hand slots never include face identity during play (`known: false`, no `key`). Drawn-card identity is only on the drawer’s view. Discard top is public. Final scoring reveals all hands.
+`RoomView.ruleSet` is the room’s current config (lobby and in-game). Every `state` / `snapshot.game` is redacted for that player. Hand slots never include face identity during play (`known: false`, no `key`). `drawnCard` is `{ id }` with no face for anyone — the drawer sees it through a `DRAW` reveal, and `drawnOptions` carries what is still legal once that expires. Discard top is public. Final scoring reveals all hands.
 
 A `CARD_REVEALED` identity is delivered **once**, on the `state` message after the reduce that created it, and only to the addressed player (with `revealId` and `expiresAt` stamped by the server). Other players get the same event with no `key` / `suit` / `value`. Snapshots and reconnects never reissue a reveal, even if it has not yet expired.
 
 | `CARD_REVEALED` field | Meaning |
 | --- | --- |
-| `cardId`, `ownerId`, `slotIndex` | Which slot lifted. Sent to everyone. |
+| `cardId`, `ownerId`, `slotIndex` | Which slot lifted. Sent to everyone. `slotIndex` is `-1` for a `DRAW`, which is in no hand. |
 | `revealedToPlayerId` | Who this copy is addressed to. Only that player's copy carries a face. |
-| `kind` | `INITIAL_PEEK`, `POWER`, or `FLIP_FAIL` |
+| `kind` | `INITIAL_PEEK`, `POWER`, `FLIP_FAIL`, or `DRAW` |
 | `durationMs` | From the `RuleSet`, per `kind` |
 | `revealId` | Server-stamped, unique per emitted reveal. The client dedupes on it. |
 | `expiresAt` | Server-stamped Unix ms. Authoritative; the client also self-expires as a backstop. |

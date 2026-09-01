@@ -6,18 +6,13 @@ import { PromptBar } from '@/components/PromptBar';
 import { Scoring } from '@/components/Scoring';
 import { SeatSwitcher } from '@/components/SeatSwitcher';
 import { useGame } from '@/lib/play-context';
-import {
-  TableInputProvider,
-  useTableInput,
-} from '@/lib/table-input';
-import {
-  isLegalCardTarget,
-  powerModeFromView,
-} from '@/lib/input-routing';
+import { TableInputProvider, useTableInput } from '@/lib/table-input';
+import { isLegalCardTarget, powerModeFromView } from '@/lib/input-routing';
 import { rankSpokenName } from '@/lib/format';
 import type { PlayerId, PublicCardView, SlotView } from '@cambeo/shared';
 import { useEffect, useRef, useState } from 'react';
 import { REVEAL_WARNING_MS, type ActiveReveal } from '@/lib/reveals';
+import { useRevealPresence, useRevealsPresence } from '@/lib/reveal-presence';
 
 function CountdownRing({ reveal }: { reveal: ActiveReveal }) {
   const [warning, setWarning] = useState(false);
@@ -60,26 +55,65 @@ function RevealLift({ viewerId }: { viewerId: PlayerId }) {
   // only the row addressed to this viewer is lifted — otherwise the same card stacks up N times.
   const lifted = reveals.filter(
     (row) =>
-      row.kind === 'POWER' ||
-      (row.kind === 'FLIP_FAIL' && row.revealedToPlayerId === viewerId),
+      row.kind === 'POWER' || (row.kind === 'FLIP_FAIL' && row.revealedToPlayerId === viewerId),
   );
-  if (lifted.length === 0) return null;
+  const presence = useRevealsPresence(lifted);
+  if (presence.length === 0) return null;
 
   return (
     <div className="reveal-overlay" role="status" aria-live="polite">
       <div className="reveal-lift-row">
-        {lifted.map((row) => {
+        {presence.map(({ reveal: row, hiding }) => {
           const mine = row.revealedToPlayerId === viewerId && row.key && row.suit;
           const face: PublicCardView | undefined = mine
             ? { id: row.cardId, key: row.key!, suit: row.suit!, value: row.value ?? 0 }
             : undefined;
           return (
             <span className="reveal-stage" key={`${row.cardId}-${row.revealedToPlayerId}`}>
-              <CountdownRing reveal={row} />
-              <CardFace face={face} asButton={false} />
+              {!hiding && <CountdownRing reveal={row} />}
+              <CardFace face={face} hiding={hiding} asButton={false} />
             </span>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The card you are holding mid-turn. Face-up only while its draw reveal is unexpired — after
+ * that you choose from memory, the same as every other look in the game.
+ */
+function DrawnCard({ cardId, viewerId }: { cardId: string; viewerId: PlayerId }) {
+  const { reveals } = useGame();
+  const live = reveals.find(
+    (row) =>
+      row.kind === 'DRAW' &&
+      row.cardId === cardId &&
+      row.revealedToPlayerId === viewerId &&
+      row.key &&
+      row.suit,
+  );
+  const presence = useRevealPresence(live);
+  const face: PublicCardView | undefined = presence
+    ? {
+        id: presence.reveal.cardId,
+        key: presence.reveal.key!,
+        suit: presence.reveal.suit!,
+        value: presence.reveal.value ?? 0,
+      }
+    : undefined;
+
+  return (
+    <div className="drawn-card-wrap">
+      <div>
+        <div className="pile-label" style={{ textAlign: 'center', marginBottom: 6 }}>
+          Drawn
+        </div>
+        <span className="card-reveal-wrap">
+          {live && <CountdownRing reveal={live} />}
+          <CardFace face={face} hiding={presence?.hiding ?? false} asButton={false} />
+        </span>
       </div>
     </div>
   );
@@ -104,8 +138,6 @@ function HandCard({
 }) {
   const { view, reveals } = useGame();
   const { localPhase, armed, onCardTap, shake, raceFade } = useTableInput();
-  if (!view) return null;
-
   const reveal = reveals.find(
     (row) =>
       row.cardId === slot.id &&
@@ -114,8 +146,16 @@ function HandCard({
       row.key &&
       row.suit,
   );
-  const face: PublicCardView | undefined = reveal
-    ? { id: reveal.cardId, key: reveal.key!, suit: reveal.suit!, value: reveal.value ?? 0 }
+  const presence = useRevealPresence(reveal);
+  if (!view) return null;
+
+  const face: PublicCardView | undefined = presence
+    ? {
+        id: presence.reveal.cardId,
+        key: presence.reveal.key!,
+        suit: presence.reveal.suit!,
+        value: presence.reveal.value ?? 0,
+      }
     : undefined;
 
   const powerMode = powerModeFromView(view, viewerId);
@@ -153,19 +193,14 @@ function HandCard({
         raceFade={raceFade && isArmed}
         matchRank={isArmed && view.discardTop ? rankSpokenName(view.discardTop.key) : null}
         ambient={ambient}
+        hiding={presence?.hiding ?? false}
         onClick={() => onCardTap(ownerId, slotIndex, slot.id)}
       />
     </span>
   );
 }
 
-function PlayerPod({
-  id,
-  you,
-}: {
-  id: PlayerId;
-  you?: boolean;
-}) {
+function PlayerPod({ id, you }: { id: PlayerId; you?: boolean }) {
   const { view, names, playMode, playersList, viewerId } = useGame();
   if (!view) return null;
   const player = view.players[id];
@@ -317,21 +352,11 @@ function TableBody() {
       </div>
 
       {view.drawnCard && view.turn?.playerId === viewerId && (
-        <div className="drawn-card-wrap">
-          <div>
-            <div className="pile-label" style={{ textAlign: 'center', marginBottom: 6 }}>
-              Drawn
-            </div>
-            <CardFace face={view.drawnCard} asButton={false} />
-          </div>
-        </div>
+        <DrawnCard cardId={view.drawnCard.id} viewerId={viewerId} />
       )}
 
       <EventLog />
-      <div
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         <PromptBar />
       </div>
 
@@ -348,7 +373,9 @@ function TableBody() {
       {edge && (
         <div
           className="edge-glow"
-          style={{ ['--glow-color' as string]: edge === 'positive' ? 'var(--positive)' : 'var(--negative)' }}
+          style={{
+            ['--glow-color' as string]: edge === 'positive' ? 'var(--positive)' : 'var(--negative)',
+          }}
         />
       )}
     </div>

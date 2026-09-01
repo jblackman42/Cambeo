@@ -8,7 +8,8 @@ import { rankSpokenName } from '@/lib/format';
 import { useEffect, useRef } from 'react';
 
 export function PromptBar() {
-  const { view, viewerId, names, lastReject, dispatch, playMode, dismissInitialPeeks } = useGame();
+  const { view, viewerId, names, lastReject, dispatch, playMode, dismissInitialPeeks, reveals } =
+    useGame();
   const { localPhase, armed, penalty, disarm, dismissPenalty } = useTableInput();
 
   const pending = view?.pendingPower;
@@ -28,8 +29,7 @@ export function PromptBar() {
   const isViewerTurn = view.turn?.playerId === viewerId;
   const name = (id: string) => names[id] ?? id;
   const seatHint = playMode === 'hotseat' ? ' Switch seat to play as them.' : '';
-  const reject =
-    lastReject && !isRaceLossReason(lastReject) ? lastReject : null;
+  const reject = lastReject && !isRaceLossReason(lastReject) ? lastReject : null;
 
   const extras = (
     <>
@@ -57,9 +57,7 @@ export function PromptBar() {
           <div>
             <p className="prompt-kicker">Flip</p>
             <p className="prompt-title">Tap again to flip</p>
-            <p className="prompt-hint">
-              Discard shows {rankSpokenName(armed.discardKey)}.
-            </p>
+            <p className="prompt-hint">Discard shows {rankSpokenName(armed.discardKey)}.</p>
           </div>
           <button type="button" className="btn btn-ghost" onClick={disarm}>
             Cancel
@@ -132,7 +130,8 @@ export function PromptBar() {
         <div className="prompt-bar">
           {extras}
           <p className="prompt-title">
-            {name(pending.playerId)} is resolving {powerActionCopy(pending.powerId, pending.stepIndex).kicker}
+            {name(pending.playerId)} is resolving{' '}
+            {powerActionCopy(pending.powerId, pending.stepIndex).kicker}
           </p>
           <p className="prompt-hint">You can still arm a flip.{seatHint}</p>
         </div>
@@ -280,7 +279,9 @@ export function PromptBar() {
         <p className="prompt-kicker">Your turn</p>
         <p className="prompt-title">Draw</p>
         <p className="prompt-hint">
-          {view.phase === 'FINAL_ROUND' ? 'Final round after Cambeo.' : 'Or call Cambeo before drawing.'}
+          {view.phase === 'FINAL_ROUND'
+            ? 'Final round after Cambeo.'
+            : 'Or call Cambeo before drawing.'}
         </p>
         <div className="btn-row">
           <button
@@ -313,13 +314,21 @@ export function PromptBar() {
   }
 
   if (view.phase === 'TURN_CHOICE' && isViewerTurn && view.drawnCard) {
-    const drawnKey = view.drawnCard.key;
-    const canReplace = (view.players[viewerId]?.cardCount ?? 0) > 0;
-    const hellLocked = drawnKey === 'HELL' && view.ruleSet.hellDiscardOnlyOntoHeaven;
-    const heavenLocked =
-      drawnKey === 'HEAVEN' &&
-      !view.ruleSet.heavenDiscardableAfterCambeo &&
-      view.cambeoCallerId !== null;
+    const drawnCardId = view.drawnCard.id;
+    // Naming the card is only honest while it is still on screen. Once the draw reveal expires
+    // the card is face-down again, so the prompt goes neutral: it says what is legal, not what
+    // the card is. The legality itself has to stay — you cannot play a hand you cannot see at all.
+    const liveDraw = reveals.find(
+      (row) =>
+        row.kind === 'DRAW' && row.cardId === drawnCardId && row.revealedToPlayerId === viewerId,
+    );
+    const shownKey = liveDraw?.key ?? null;
+    const options = view.drawnOptions;
+    const canDiscard = options?.canDiscard ?? true;
+    const canReplace = options?.canReplace ?? false;
+    const fromDiscard = options?.fromDiscard ?? view.turn?.drawnFrom === 'DISCARD';
+    const hellLocked = !canDiscard && shownKey === 'HELL';
+    const heavenLocked = !canDiscard && shownKey === 'HEAVEN';
 
     const keep = (label: string, primary = false) => (
       <button
@@ -365,15 +374,33 @@ export function PromptBar() {
       );
     }
 
+    if (!canDiscard) {
+      return (
+        <div className="prompt-bar">
+          {extras}
+          <p className="prompt-kicker">Your turn</p>
+          <p className="prompt-title">{canReplace ? 'Replace or keep?' : 'Keep it'}</p>
+          <p className="prompt-hint">
+            {canReplace
+              ? 'This one cannot go on the discard pile. Tap one of your cards to replace it, or keep it as an extra card.'
+              : 'This one cannot go on the discard pile, and you have no card you can legally put there. Keep it to end your turn.'}
+          </p>
+          <div className="btn-row">{keep('Keep', !canReplace)}</div>
+        </div>
+      );
+    }
+
     return (
       <div className="prompt-bar">
         {extras}
         <p className="prompt-kicker">Your turn</p>
-        <p className="prompt-title">Discard, replace, or keep?</p>
+        <p className="prompt-title">
+          {canReplace ? 'Discard, replace, or keep?' : 'Discard or keep?'}
+        </p>
         <p className="prompt-hint">
-          {view.turn?.drawnFrom === 'DISCARD'
-            ? 'Drawn from discard — discarding it will not fire a power. Tap one of your cards to replace it.'
-            : 'Discard to use its power, tap a card to replace, or keep it as an extra card.'}
+          {fromDiscard
+            ? `Drawn from discard — discarding it will not fire a power.${canReplace ? ' Tap one of your cards to replace it.' : ''}`
+            : `Discard to use its power,${canReplace ? ' tap a card to replace,' : ''} or keep it as an extra card.`}
         </p>
         <div className="btn-row">
           <button
@@ -392,7 +419,9 @@ export function PromptBar() {
   return (
     <div className="prompt-bar">
       {extras}
-      <p className="prompt-title">{view.turn ? `${name(view.turn.playerId)}'s turn` : view.phase}</p>
+      <p className="prompt-title">
+        {view.turn ? `${name(view.turn.playerId)}'s turn` : view.phase}
+      </p>
       <p className="prompt-hint">
         {localPhase === 'CALLED_CAMBEO'
           ? 'You called Cambeo. Your cards are locked.'

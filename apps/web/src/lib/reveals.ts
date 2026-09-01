@@ -2,7 +2,7 @@ import type { CardKey, GameEvent, PlayerId, Suit } from '@cambeo/shared';
 
 export const REVEAL_WARNING_MS = 1500;
 
-export type RevealKind = 'INITIAL_PEEK' | 'POWER' | 'FLIP_FAIL';
+export type RevealKind = 'INITIAL_PEEK' | 'POWER' | 'FLIP_FAIL' | 'DRAW';
 
 export type ActiveReveal = {
   /** Server-stamped, unique per emitted reveal. Falls back to a local key in hot-seat. */
@@ -25,9 +25,7 @@ export type ActiveReveal = {
  * which is the only replay that can happen without a socket.
  */
 function revealIdFor(event: Extract<GameEvent, { type: 'CARD_REVEALED' }>): string {
-  return (
-    event.revealId ?? `local:${event.cardId}:${event.revealedToPlayerId}:${event.kind}`
-  );
+  return event.revealId ?? `local:${event.cardId}:${event.revealedToPlayerId}:${event.kind}`;
 }
 
 export function ingestReveals(
@@ -59,6 +57,38 @@ export function ingestReveals(
     });
   }
   return next;
+}
+
+/**
+ * Hot-seat deals every seat's initial peek in one batch, but the seats look at the device one at
+ * a time. Ingesting all of them at deal time would run one clock for the whole table and seat 3
+ * would find their peek already gone. So the store holds the batch and arms one seat at a time:
+ * these two helpers split the batch from everything else.
+ */
+export function initialPeekEventsFor(
+  events: readonly GameEvent[],
+  playerId: PlayerId,
+): GameEvent[] {
+  return events.filter(
+    (event) =>
+      event.type === 'CARD_REVEALED' &&
+      event.kind === 'INITIAL_PEEK' &&
+      event.revealedToPlayerId === playerId,
+  );
+}
+
+export function withoutForeignInitialPeeks(
+  events: readonly GameEvent[],
+  viewerId: PlayerId,
+): GameEvent[] {
+  return events.filter(
+    (event) =>
+      !(
+        event.type === 'CARD_REVEALED' &&
+        event.kind === 'INITIAL_PEEK' &&
+        event.revealedToPlayerId !== viewerId
+      ),
+  );
 }
 
 export function expireReveals(current: ActiveReveal[], now: number): ActiveReveal[] {

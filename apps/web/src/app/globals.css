@@ -45,7 +45,11 @@ body {
   min-height: 100%;
   color: var(--text);
   background-color: var(--bg);
-  background-image: radial-gradient(ellipse 70% 55% at 50% 42%, rgba(255, 255, 255, 0.035), transparent 70%);
+  background-image: radial-gradient(
+    ellipse 70% 55% at 50% 42%,
+    rgba(255, 255, 255, 0.035),
+    transparent 70%
+  );
   background-attachment: fixed;
 }
 
@@ -407,7 +411,9 @@ button {
 .player-pod[data-active='true'] {
   background: var(--surface-2);
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 28px var(--turn-glow);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 28px var(--turn-glow);
 }
 
 .player-pod[data-locked='true'] {
@@ -507,7 +513,9 @@ button {
 
 .discard-heaven {
   border-radius: 10px;
-  box-shadow: 0 0 0 2px var(--heaven), 0 0 18px color-mix(in srgb, var(--heaven) 45%, transparent);
+  box-shadow:
+    0 0 0 2px var(--heaven),
+    0 0 18px color-mix(in srgb, var(--heaven) 45%, transparent);
 }
 
 .prompt-bar {
@@ -787,6 +795,23 @@ button {
   object-fit: cover;
 }
 
+/* The back sits under every card, face or not, so a face has something to fade off. */
+.card-back-art {
+  object-fit: cover;
+}
+
+.card-face-layer {
+  position: absolute;
+  inset: 0;
+  /* The art is transparent, so the layer carries the frame's own fill. Without it the back
+     underneath shows through the face and every revealed card reads as patterned. */
+  background: var(--card-fill);
+}
+
+.card-face-layer[data-hiding='true'] {
+  animation: reveal-settle 220ms var(--ease-in-out) forwards;
+}
+
 .card-joker-name {
   position: absolute;
   top: 50%;
@@ -945,6 +970,18 @@ button {
   to {
     transform: none;
     opacity: 1;
+  }
+}
+
+/* A reveal ending. The face fades off the back it was covering; the back is already there. */
+@keyframes reveal-settle {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
   }
 }
 

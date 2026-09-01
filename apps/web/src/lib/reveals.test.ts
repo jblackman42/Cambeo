@@ -3,7 +3,9 @@ import {
   dismissInitialPeeks,
   expireReveals,
   ingestReveals,
+  initialPeekEventsFor,
   nextExpiryAt,
+  withoutForeignInitialPeeks,
   type ActiveReveal,
 } from './reveals';
 import type { GameEvent } from '@cambeo/shared';
@@ -129,5 +131,63 @@ describe('ActiveReveal', () => {
     expect(facesHeld([row], 'p1', 0)).toContain('c9');
     expect(facesHeld([row], 'p2', 0)).toHaveLength(0);
     expect(facesHeld([row], 'p1', 4001)).toHaveLength(0);
+  });
+});
+
+describe('draw reveal', () => {
+  it('the held card is forgotten on its own clock, like any other look', () => {
+    const held = ingestReveals(
+      [],
+      [peek({ revealId: 'd1', cardId: 'drawn', kind: 'DRAW', durationMs: 5000, expiresAt: 5000 })],
+      0,
+    );
+    expect(facesHeld(held, 'p1', 0)).toContain('drawn');
+    expect(expireReveals(held, 5001)).toHaveLength(0);
+  });
+});
+
+describe('hot-seat initial peeks', () => {
+  // Hot-seat runs the engine locally, so these arrive raw: no server revealId, no server
+  // expiresAt. The clock starts when the client ingests them, which is the whole point here.
+  const local = (overrides: Partial<GameEvent & { type: 'CARD_REVEALED' }>) =>
+    peek({ revealId: undefined, expiresAt: undefined, ...overrides });
+
+  const batch = [
+    local({ cardId: 'c1', revealedToPlayerId: 'p1', ownerId: 'p1' }),
+    local({ cardId: 'c2', revealedToPlayerId: 'p1', ownerId: 'p1' }),
+    local({ cardId: 'c5', revealedToPlayerId: 'p2', ownerId: 'p2' }),
+    local({ cardId: 'c6', revealedToPlayerId: 'p2', ownerId: 'p2' }),
+  ];
+
+  it('splits the deal batch by seat so each seat can be armed on its own', () => {
+    expect(initialPeekEventsFor(batch, 'p2')).toHaveLength(2);
+    expect(initialPeekEventsFor(batch, 'p3')).toHaveLength(0);
+  });
+
+  it('holds back the other seats’ peeks without touching anything else', () => {
+    const events = [
+      ...batch,
+      local({ cardId: 'c9', kind: 'POWER', revealedToPlayerId: 'p2' }),
+      { type: 'TURN_STARTED', playerId: 'p1' } as GameEvent,
+    ];
+    const kept = withoutForeignInitialPeeks(events, 'p1');
+    expect(
+      kept.filter((e) => e.type === 'CARD_REVEALED' && e.kind === 'INITIAL_PEEK'),
+    ).toHaveLength(2);
+    // A power reveal addressed elsewhere still travels: the overlay shows it face-down.
+    expect(kept.some((e) => e.type === 'CARD_REVEALED' && e.kind === 'POWER')).toBe(true);
+    expect(kept.some((e) => e.type === 'TURN_STARTED')).toBe(true);
+  });
+
+  it('arming a seat later starts that seat’s clock from then, not from the deal', () => {
+    const atDeal = ingestReveals([], withoutForeignInitialPeeks(batch, 'p1'), 0);
+    expect(atDeal).toHaveLength(2);
+
+    // Seat 2 picks up the device four seconds in; its peek must still run a full 8s.
+    const armedLater = ingestReveals(atDeal, initialPeekEventsFor(batch, 'p2'), 4000);
+    const seat2 = armedLater.filter((row) => row.revealedToPlayerId === 'p2');
+    expect(seat2).toHaveLength(2);
+    expect(seat2.every((row) => row.expiresAt === 12_000)).toBe(true);
+    expect(facesHeld(armedLater, 'p2', 10_001)).toHaveLength(2);
   });
 });

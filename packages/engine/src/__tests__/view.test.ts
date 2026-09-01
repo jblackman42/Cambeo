@@ -137,7 +137,7 @@ describe('view', () => {
     if (reveal?.type === 'CARD_REVEALED') expect(reveal.key).toBe('5');
   });
 
-  it('engine invariant: identities are only unexpired reveals, drawn card, discard top, or scoring', () => {
+  it('engine invariant: identities are only unexpired reveals, discard top, or scoring', () => {
     let state = createGame(DEFAULT_PLAYERS, 'inv-seed', HOUSE_RULES);
     state = apply(state, { type: 'START_GAME', playerId: P1 });
     for (const pid of DEFAULT_PLAYERS) {
@@ -181,12 +181,16 @@ describe('view', () => {
     );
     state = apply(state, { type: 'DRAW_DECK', playerId: P2 });
     const later = viewFor(state, P1, HOUSE_RULES);
-    expect(later.lastEvents.some((e) => e.type === 'CARD_REVEALED')).toBe(false);
+    // P2's draw reveal is in this batch, but addressed to P2, so P1 sees it stripped of its face.
+    // What must not survive is the earlier peek identity.
+    expect(later.lastEvents.some((e) => e.type === 'CARD_REVEALED' && e.key !== undefined)).toBe(
+      false,
+    );
     expect(later.players[P2]!.hand.find((s) => s.id === targetId)!.known).toBe(false);
     assertViewIdentityInvariant(later);
   });
 
-  it('holding a drawn card loses that identity once it is discarded or replaced', () => {
+  it('the drawn identity comes from the draw reveal and is gone once the card is played', () => {
     let state = startStacked({
       hands: {
         p1: [{ key: 'A' }, { key: '2' }, { key: '3' }, { key: '4' }],

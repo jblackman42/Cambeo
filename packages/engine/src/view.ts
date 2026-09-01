@@ -1,5 +1,6 @@
 import {
   cardValue,
+  type DrawnOptionsView,
   type GameEvent,
   type RedactedGameView,
   type SlotView,
@@ -8,6 +9,7 @@ import {
 } from '@cambeo/shared';
 import type { GameState, PlayerId } from './state.js';
 import { getCard } from './setup.js';
+import { canPlaceOnDiscard } from './jokers.js';
 
 function slotView(state: GameState, cardId: string, ruleSet: RuleSet): SlotView {
   if (state.phase === 'SCORING' || state.phase === 'OVER') {
@@ -21,6 +23,32 @@ function slotView(state: GameState, cardId: string, ruleSet: RuleSet): SlotView 
     };
   }
   return { id: cardId, known: false };
+}
+
+/**
+ * Which finishes are open to the player holding the drawn card. The client used to read the
+ * drawn key to work this out; now that the key expires with the draw reveal, the engine has to
+ * answer it. These are booleans about legality, never about identity: `canReplace` says a legal
+ * slot exists, not which one.
+ */
+function drawnOptionsFor(
+  state: GameState,
+  playerId: PlayerId,
+  ruleSet: RuleSet,
+  drawnCardId: CardId,
+): DrawnOptionsView {
+  const drawn = getCard(state, drawnCardId);
+  const hand = state.players[playerId]?.hand ?? [];
+  return {
+    canDiscard: canPlaceOnDiscard(state, ruleSet, drawn.key).ok,
+    // Replacing puts the *old* card on the pile, so a hand of nothing but undiscardable cards
+    // leaves no legal slot to swap into.
+    canReplace: hand.some(
+      (cardId) => canPlaceOnDiscard(state, ruleSet, getCard(state, cardId).key).ok,
+    ),
+    canKeep: true,
+    fromDiscard: state.turn?.drawnFrom === 'DISCARD',
+  };
 }
 
 /**
@@ -68,7 +96,6 @@ function redactEvent(viewerId: PlayerId, event: GameEvent): GameEvent {
 export function identitiesInView(view: RedactedGameView): Set<CardId> {
   const ids = new Set<CardId>();
   if (view.discardTop) ids.add(view.discardTop.id);
-  if (view.drawnCard) ids.add(view.drawnCard.id);
   if (view.phase === 'SCORING' || view.phase === 'OVER') {
     for (const player of Object.values(view.players)) {
       for (const slot of player.hand) {
@@ -89,6 +116,12 @@ export function identitiesInView(view: RedactedGameView): Set<CardId> {
 }
 
 export function assertViewIdentityInvariant(view: RedactedGameView): void {
+  // The held card is a reveal like any other. If a face ever rides along on `drawnCard`, the
+  // identity outlives its timer for the whole turn, which is the leak this model exists to close.
+  if (view.drawnCard && 'key' in (view.drawnCard as object)) {
+    throw new Error('INVARIANT: drawnCard carried a face key outside its draw reveal');
+  }
+
   for (const player of Object.values(view.players)) {
     for (const slot of player.hand) {
       if (slot.known && view.phase !== 'SCORING' && view.phase !== 'OVER') {
@@ -106,7 +139,6 @@ export function assertViewIdentityInvariant(view: RedactedGameView): void {
   // than CARD_REVEALED alone is what stops a new event type from quietly reopening the leak.
   const publiclyKnown = new Set<CardId>();
   if (view.discardTop) publiclyKnown.add(view.discardTop.id);
-  if (view.drawnCard) publiclyKnown.add(view.drawnCard.id);
   if (view.phase === 'SCORING' || view.phase === 'OVER') {
     for (const player of Object.values(view.players)) {
       for (const slot of player.hand) publiclyKnown.add(slot.id);
@@ -129,11 +161,7 @@ export function assertViewIdentityInvariant(view: RedactedGameView): void {
   }
 }
 
-export function viewFor(
-  state: GameState,
-  viewerId: PlayerId,
-  ruleSet: RuleSet,
-): RedactedGameView {
+export function viewFor(state: GameState, viewerId: PlayerId, ruleSet: RuleSet): RedactedGameView {
   const players: RedactedGameView['players'] = {};
   for (const playerId of state.seating) {
     const hand = state.players[playerId]!.hand.map((cardId) => slotView(state, cardId, ruleSet));
@@ -144,8 +172,7 @@ export function viewFor(
     };
   }
 
-  const discardTopId =
-    state.discard.length > 0 ? state.discard[state.discard.length - 1]! : null;
+  const discardTopId = state.discard.length > 0 ? state.discard[state.discard.length - 1]! : null;
   const discardTop = discardTopId
     ? (() => {
         const card = getCard(state, discardTopId);
@@ -158,15 +185,13 @@ export function viewFor(
       })()
     : null;
 
+  // The held card is projected without its face. Its identity travels only in the time-boxed
+  // draw reveal, so the holder sees it briefly and then plays from memory like everyone else.
   let drawnCard: RedactedGameView['drawnCard'] = null;
+  let drawnOptions: RedactedGameView['drawnOptions'] = null;
   if (state.drawnCard && state.turn?.playerId === viewerId) {
-    const card = getCard(state, state.drawnCard);
-    drawnCard = {
-      id: state.drawnCard,
-      key: card.key,
-      suit: card.suit,
-      value: cardValue(ruleSet, card.key),
-    };
+    drawnCard = { id: state.drawnCard };
+    drawnOptions = drawnOptionsFor(state, viewerId, ruleSet, state.drawnCard);
   }
 
   return {
@@ -185,6 +210,7 @@ export function viewFor(
         }
       : null,
     drawnCard,
+    drawnOptions,
     pendingPower: state.pendingPower
       ? {
           playerId: state.pendingPower.playerId,

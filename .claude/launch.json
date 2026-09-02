@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 3000
+    },
+    {
+      "name": "room-server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:server"],
+      "port": 8787
+    }
+  ]
+}

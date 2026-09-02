@@ -1,81 +1,119 @@
 'use client';
 
-import { isHouseRules, validateForTable } from '@cambeo/shared';
-import { useState } from 'react';
+import { validateForTable } from '@cambeo/shared';
+import { QrCode, Settings } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useGame } from '@/lib/play-context';
-import { RulesSummary } from '@/components/RulesSummary';
+import { getUsername } from '@/lib/session';
+import { CopyLinkField } from '@/components/CopyLinkField';
+import { MuteToggle } from '@/components/MuteToggle';
+import { NamePrompt } from '@/components/NamePrompt';
+import { QrModal } from '@/components/QrModal';
 import { SettingsPanel } from '@/components/SettingsPanel';
 
 export function OnlineLobby() {
-  const { roomCode, playersList, isHost, startGame, ruleSet, lastError, wsStatus } = useGame();
-  const [copied, setCopied] = useState(false);
+  const { roomCode, playersList, isHost, startGame, ruleSet, lastError, wsStatus, renameSelf } =
+    useGame();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [needsName, setNeedsName] = useState(false);
+  const [origin, setOrigin] = useState('');
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+    if (!getUsername().trim()) setNeedsName(true);
+  }, []);
+
   const table = validateForTable(ruleSet, playersList.length);
   const canStart = isHost && table.ok;
-
-  const copy = async () => {
-    if (!roomCode) return;
-    const url = `${window.location.origin}/r/${roomCode}`;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  if (settingsOpen && isHost) {
-    return <SettingsPanel onClose={() => setSettingsOpen(false)} />;
-  }
+  const url = origin && roomCode ? `${origin}/r/${roomCode}` : '';
 
   return (
-    <div className="panel">
-      <h2>Room {roomCode}</h2>
-      <p className="brand-sub" style={{ marginBottom: '1rem' }}>
-        Share the code. Host starts at {ruleSet.minPlayers}+ players.
-        {isHouseRules(ruleSet) ? ' House Rules.' : ' Custom rules.'}
-        {wsStatus !== 'open' ? ` · ${wsStatus}` : ''}
-      </p>
+    <div className="lobby">
+      <header className="lobby-head">
+        <span className="wordmark">Cambeo</span>
+        <div className="icon-row">
+          <MuteToggle />
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => setQrOpen(true)}
+            aria-label="Show join QR code"
+            title="Scan to join"
+            disabled={!url}
+          >
+            <QrCode size={20} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => setSettingsOpen(true)}
+            aria-label={isHost ? 'Game settings' : 'View rules'}
+            title={isHost ? 'Settings' : 'Rules'}
+          >
+            <Settings size={20} aria-hidden />
+          </button>
+        </div>
+      </header>
+
+      <div className="room-hero">
+        <span className="room-code-label">Room code</span>
+        <p className="room-code tabular" data-long={(roomCode?.length ?? 0) > 6}>
+          {roomCode}
+        </p>
+      </div>
+
+      {url && <CopyLinkField url={url} />}
 
       {lastError && <div className="reject-toast">{lastError}</div>}
+      {wsStatus !== 'open' && (
+        <p className="status-line">
+          {wsStatus === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
+        </p>
+      )}
 
-      <div className="btn-row" style={{ marginBottom: '1rem' }}>
-        <button type="button" className="btn btn-ghost" onClick={() => void copy()}>
-          {copied ? 'Copied' : 'Copy link'}
-        </button>
-      </div>
-
-      <div className="lobby-list">
+      <ul className="player-list">
         {playersList.map((p) => (
-          <div className="lobby-row" key={p.playerId}>
-            <span>
-              <span className={p.connected ? 'dot-on' : 'dot-off'} aria-hidden />
-              {p.name}
-              {p.isHost ? ' · host' : ''}
-              {!p.connected ? ' · away' : ''}
-            </span>
-          </div>
+          <li className="player-row" key={p.playerId}>
+            <span className={p.connected ? 'dot-on' : 'dot-off'} aria-hidden />
+            <span className="player-name">{p.name}</span>
+            {p.isHost && <span className="player-tag">Host</span>}
+            {!p.connected && <span className="player-tag">Away</span>}
+          </li>
         ))}
-      </div>
+      </ul>
 
-      <div className="btn-row" style={{ margin: '1rem 0' }}>
+      <div className="action-bar">
         {isHost ? (
           <>
-            <button type="button" className="btn btn-ghost" onClick={() => setSettingsOpen(true)}>
-              Settings
-            </button>
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary btn-hero"
               disabled={!canStart}
               onClick={startGame}
             >
               Start game
             </button>
+            {!table.ok && <p className="status-line">{table.errors.join(' · ')}</p>}
           </>
         ) : (
-          <p className="prompt-hint">Waiting for the host to start…</p>
+          <p className="status-line">Waiting for the host</p>
         )}
       </div>
 
-      <RulesSummary ruleSet={ruleSet} playerCount={playersList.length} />
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      {qrOpen && url && (
+        <QrModal url={url} roomCode={roomCode ?? ''} onClose={() => setQrOpen(false)} />
+      )}
+      {needsName && (
+        <NamePrompt
+          onSubmit={(name) => {
+            renameSelf?.(name);
+            setNeedsName(false);
+          }}
+          onDismiss={() => setNeedsName(false)}
+        />
+      )}
     </div>
   );
 }

@@ -4,7 +4,13 @@ import type { Action, PlayerId, RoomView, ServerMessage } from '@cambeo/shared';
 import { repairRuleSet } from '@cambeo/shared';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PlayProvider, deriveMode, type InteractionMode, type PlayStore } from '@/lib/play-context';
-import { getSessionPlayerId, getUsername, setSessionPlayerId, workerWsUrl } from '@/lib/session';
+import {
+  getSessionPlayerId,
+  getUsername,
+  setSessionPlayerId,
+  setUsername,
+  workerWsUrl,
+} from '@/lib/session';
 import {
   dismissInitialPeeks as dropInitialPeeks,
   expireReveals,
@@ -175,6 +181,13 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
     startGame: () => send({ type: 'start' }),
     applyRules: (next) => send({ type: 'setRules', ruleSet: next }),
     resetLobby: null,
+    renameSelf: (name) => {
+      const trimmed = name.trim().slice(0, 20);
+      if (!trimmed) return;
+      setUsername(trimmed);
+      // Re-sending join with our own playerId is a rename on the server side.
+      send({ type: 'join', name: trimmed, playerId: getSessionPlayerId(code) ?? effectiveViewer });
+    },
     wsStatus,
     lastError,
     reveals,

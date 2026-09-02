@@ -141,6 +141,7 @@ export function GameProvider({
     startGame: () => undefined,
     applyRules,
     resetLobby,
+    renameSelf: null,
     wsStatus: 'idle',
     lastError: null,
     reveals,

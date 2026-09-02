@@ -29,6 +29,8 @@ export interface PlayStore {
   startGame: () => void;
   applyRules: (ruleSet: RuleSet) => void;
   resetLobby: ((names: string[]) => void) | null;
+  /** Online only: re-announce this player under a new name. */
+  renameSelf: ((name: string) => void) | null;
   wsStatus: 'idle' | 'connecting' | 'open' | 'closed' | 'error';
   lastError: string | null;
   reveals: ActiveReveal[];

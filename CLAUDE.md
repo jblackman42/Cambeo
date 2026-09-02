@@ -24,7 +24,7 @@ Also: `Math.random` is banned in `packages/engine` and `packages/shared` (ESLint
 ```
 packages/shared   RuleSet zod schema, card keys, power ids, House Rules preset, view wire types, protocol
 packages/engine   Pure rules engine: reduce(state, action, ruleSet, rng) => state
-apps/web          Next.js App Router UI (online rooms + /hotseat)
+apps/web          Next.js App Router UI (online rooms; /hotseat is a deprecated, unlinked dev route)
 packages/server   Cloudflare Worker + Durable Object (one DO per room)
 docs/             Game rules + app spec + protocol
 ```

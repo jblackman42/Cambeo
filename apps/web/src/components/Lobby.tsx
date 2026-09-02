@@ -18,10 +18,6 @@ export function Lobby() {
   const canStart =
     table.ok && names.length >= ruleSet.minPlayers && names.every((n) => n.trim().length > 0);
 
-  if (settingsOpen) {
-    return <SettingsPanel onClose={() => setSettingsOpen(false)} />;
-  }
-
   return (
     <div className="panel">
       <h2>Hot-seat lobby</h2>
@@ -77,6 +73,8 @@ export function Lobby() {
       </div>
 
       <RulesSummary ruleSet={ruleSet} playerCount={names.length} />
+
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

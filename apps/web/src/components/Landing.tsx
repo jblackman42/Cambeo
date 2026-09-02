@@ -1,8 +1,7 @@
 'use client';
 
 import { MuteToggle } from '@/components/MuteToggle';
-import { getRememberedPlayerId, getUsername, setUsername, workerHttpUrl } from '@/lib/session';
-import Link from 'next/link';
+import { getUsername, setUsername, workerHttpUrl } from '@/lib/session';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -24,7 +23,7 @@ export function Landing() {
 
   const create = async () => {
     if (!name.trim()) {
-      setError('Enter a username first');
+      setError('Enter your name first');
       return;
     }
     setBusy(true);
@@ -47,7 +46,7 @@ export function Landing() {
 
   const join = () => {
     if (!name.trim()) {
-      setError('Enter a username first');
+      setError('Enter your name first');
       return;
     }
     const trimmed = code.trim().toUpperCase();
@@ -58,64 +57,57 @@ export function Landing() {
     router.push(`/r/${trimmed}`);
   };
 
-  const remembered = code.trim() ? getRememberedPlayerId(code.trim()) : undefined;
-
   return (
-    <div className="app-shell">
-      <header className="chrome-row">
-        <div>
-          <h1 className="brand">Cambeo</h1>
-          <p className="brand-sub">Fewest points wins. Create a room or join by code.</p>
+    <div className="app-shell landing">
+      <header className="lobby-head">
+        <span className="wordmark">Cambeo</span>
+        <div className="icon-row">
+          <MuteToggle />
         </div>
-        <MuteToggle />
       </header>
 
-      <div className="panel">
-        <h2>Your name</h2>
-        <div className="lobby-row">
-          <input
-            value={name}
-            onChange={(e) => saveName(e.target.value)}
-            maxLength={20}
-            aria-label="Username"
-            placeholder="Alex"
-          />
-        </div>
+      <div className="landing-body">
+        <input
+          className="text-input text-input-lg"
+          value={name}
+          onChange={(e) => saveName(e.target.value)}
+          maxLength={20}
+          aria-label="Your name"
+          placeholder="Your name"
+        />
 
         {error && <div className="reject-toast">{error}</div>}
 
-        <div className="btn-row" style={{ margin: '1rem 0' }}>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void create()}>
-            {busy ? 'Creating…' : 'Create room'}
-          </button>
+        <button
+          type="button"
+          className="btn btn-primary btn-hero"
+          disabled={busy}
+          onClick={() => void create()}
+        >
+          {busy ? 'Creating…' : 'Create room'}
+        </button>
+
+        <div className="rule-or">
+          <span>or</span>
         </div>
 
-        <h2>Join</h2>
-        <div className="lobby-row">
+        <div className="join-row">
           <input
+            className="text-input code-input tabular"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             maxLength={8}
             aria-label="Room code"
-            placeholder="Room code"
+            placeholder="CODE"
             onKeyDown={(e) => {
               if (e.key === 'Enter') join();
             }}
           />
-        </div>
-        <div className="btn-row" style={{ marginTop: '0.75rem' }}>
-          <button type="button" className="btn btn-ghost" onClick={join}>
-            Join room
+          <button type="button" className="btn btn-ghost btn-join" onClick={join}>
+            Join
           </button>
         </div>
-        {remembered && (
-          <p className="prompt-hint">This browser has a saved seat for that room (this tab is a new seat unless you reopen the same tab).</p>
-        )}
       </div>
-
-      <p className="brand-sub">
-        <Link href="/hotseat">Hot-seat (one device, no server)</Link>
-      </p>
     </div>
   );
 }

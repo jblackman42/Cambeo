@@ -16,18 +16,21 @@ import {
   type PowerId,
   type RuleSet,
 } from '@cambeo/shared';
+import { Check, Copy } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGame } from '@/lib/play-context';
+import { Modal } from '@/components/Modal';
 import { cardKeyLabel, formatPoints, powerLabel } from '@/lib/format';
 
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
-  const { ruleSet, applyRules, lastError } = useGame();
+  const { ruleSet, applyRules, lastError, isHost } = useGame();
   const [draft, setDraft] = useState<RuleSet>(() => cloneRuleSet(ruleSet));
   const lastCustom = useRef<RuleSet | null>(isHouseRules(ruleSet) ? null : cloneRuleSet(ruleSet));
   const [paste, setPaste] = useState('');
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const appliedCode = encodeRuleSetCode(ruleSet);
+  const locked = !isHost;
 
   useEffect(() => {
     const applied = decodeRuleSetCode(appliedCode);
@@ -38,7 +41,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const summary = useMemo(() => summarizeDeck(draft), [draft]);
   const dirty = encodeRuleSetCode(draft) !== appliedCode;
   const house = isHouseRules(draft);
-  const canApply = dirty && parsed.success;
+  const canApply = !locked && dirty && parsed.success;
 
   const setScalar = <K extends keyof RuleSet>(key: K, value: RuleSet[K]) => {
     setDraft((prev) => {
@@ -100,26 +103,27 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="panel">
-      <div className="btn-row" style={{ marginBottom: '0.75rem' }}>
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
-          Back
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={!canApply}
-          onClick={() => applyRules(draft)}
-        >
-          Apply rules
-        </button>
-      </div>
-
-      <h2>Settings</h2>
-      <p className="brand-sub" style={{ marginBottom: '1rem' }}>
-        Locked once the game starts. Everyone in the lobby sees the applied ruleset.
-      </p>
-
+    <Modal
+      title={locked ? 'Rules' : 'Settings'}
+      onClose={onClose}
+      footer={
+        locked ? (
+          <p className="status-line">Only the host can change these</p>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            disabled={!canApply}
+            onClick={() => {
+              applyRules(draft);
+              onClose();
+            }}
+          >
+            Apply
+          </button>
+        )
+      }
+    >
       {lastError && <div className="reject-toast">{lastError}</div>}
       {!parsed.success && (
         <div className="reject-toast">
@@ -127,15 +131,21 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      <div className="btn-row" style={{ marginBottom: '1rem' }}>
-        <button type="button" className="btn btn-ghost" data-active={house} onClick={applyHouse}>
+      <div className="btn-row seg-row">
+        <button
+          type="button"
+          className="btn btn-ghost"
+          data-active={house}
+          disabled={locked}
+          onClick={applyHouse}
+        >
           House Rules
         </button>
         <button
           type="button"
           className="btn btn-ghost"
           data-active={!house}
-          disabled={house && !lastCustom.current}
+          disabled={locked || (house && !lastCustom.current)}
           onClick={applyCustom}
         >
           Custom
@@ -165,7 +175,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </div>
       </section>
 
-      <fieldset className="settings-section">
+      <fieldset className="settings-section" disabled={locked}>
         <legend>Deck</legend>
         <label className="field-check">
           <input
@@ -177,7 +187,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </label>
       </fieldset>
 
-      <fieldset className="settings-section">
+      <fieldset className="settings-section" disabled={locked}>
         <legend>Game</legend>
         <label className="field">
           Starting hand size
@@ -283,7 +293,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </label>
       </fieldset>
 
-      <fieldset className="settings-section">
+      <fieldset className="settings-section" disabled={locked}>
         <legend>Card values and powers</legend>
         <div className="settings-card-head">
           <span>Card</span>
@@ -323,42 +333,57 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
       </fieldset>
 
       <fieldset className="settings-section">
-        <legend>Share these rules</legend>
-        <p className="prompt-hint">Copy a code, or paste one to load a ruleset.</p>
-        <div className="btn-row" style={{ margin: '0.65rem 0' }}>
-          <button type="button" className="btn btn-ghost" onClick={() => void copyCode()}>
-            {copied ? 'Copied' : 'Copy rules code'}
+        <legend>Rules code</legend>
+        <div className="copy-field">
+          <input
+            className="copy-field-input"
+            readOnly
+            value={encodeRuleSetCode(draft)}
+            aria-label="Rules code"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <button
+            type="button"
+            className="icon-btn copy-field-btn"
+            onClick={() => void copyCode()}
+            aria-label={copied ? 'Rules code copied' : 'Copy rules code'}
+            title={copied ? 'Copied' : 'Copy rules code'}
+            data-copied={copied}
+          >
+            {copied ? <Check size={18} aria-hidden /> : <Copy size={18} aria-hidden />}
           </button>
         </div>
-        <label className="field">
-          Import
-          <input
-            value={paste}
-            onChange={(e) => {
-              setPaste(e.target.value);
-              setPasteError(null);
-            }}
-            placeholder="c1.…"
-            aria-label="Rules code"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') importCode();
-            }}
-          />
-        </label>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!paste.trim()}
-          onClick={importCode}
-        >
-          Import
-        </button>
+        {!locked && (
+          <div className="import-row">
+            <input
+              className="text-input"
+              value={paste}
+              onChange={(e) => {
+                setPaste(e.target.value);
+                setPasteError(null);
+              }}
+              placeholder="Paste a rules code"
+              aria-label="Import rules code"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') importCode();
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={!paste.trim()}
+              onClick={importCode}
+            >
+              Import
+            </button>
+          </div>
+        )}
         {pasteError && (
           <div className="reject-toast" style={{ marginTop: '0.65rem' }}>
             {pasteError}
           </div>
         )}
       </fieldset>
-    </div>
+    </Modal>
   );
 }

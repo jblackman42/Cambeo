@@ -8,7 +8,16 @@ import { useGame } from '@/lib/play-context';
 import { OnlineProvider } from '@/lib/online-store';
 
 function Shell() {
-  const { view, wsStatus, lastError, roomCode } = useGame();
+  const { view, wsStatus, roomCode } = useGame();
+
+  if (!view) {
+    return (
+      <div className="app-shell app-shell-lobby">
+        <CardArtPreloader />
+        <OnlineLobby />
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -24,8 +33,7 @@ function Shell() {
         </div>
         <MuteToggle />
       </header>
-      {lastError && !view && <div className="reject-toast">{lastError}</div>}
-      {!view ? <OnlineLobby /> : <Table />}
+      <Table />
     </div>
   );
 }

@@ -32,7 +32,9 @@ pnpm dev:server   # wrangler → http://localhost:8787
 pnpm dev          # UI → http://localhost:3000
 ```
 
-Then **Create room** on the landing page. Two tabs in the same browser are two players (player id is per-tab `sessionStorage`). Refresh reconnects that tab. Hot-seat (no server) is at `/hotseat`.
+Then **Create room** on the landing page. Two tabs in the same browser are two players (player id is per-tab `sessionStorage`). Refresh reconnects that tab.
+
+Hot-seat is deprecated: `/hotseat` still works as an unlinked dev route for driving the engine without a server, but it is no longer linked from the UI.
 
 If create-room fails, the worker is not running.
 
@@ -43,7 +45,7 @@ If create-room fails, the worker is not running.
 | `@cambeo/shared` | Card keys, powers, zod `RuleSet`, House Rules, wire protocol |
 | `@cambeo/engine` | Deterministic authoritative rules engine |
 | `@cambeo/server` | Cloudflare Worker + Durable Object rooms |
-| `@cambeo/web` | Next.js UI (online + hot-seat) |
+| `@cambeo/web` | Next.js UI (online rooms; deprecated hot-seat dev route) |
 
 ## License
 

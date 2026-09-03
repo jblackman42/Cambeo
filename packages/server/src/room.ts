@@ -168,6 +168,8 @@ export class RoomController {
         return this.join(connId, msg.name, msg.playerId);
       case 'leave':
         return this.leave(connId);
+      case 'kick':
+        return this.kick(connId, msg.playerId);
       case 'start':
         return this.start(connId);
       case 'setRules':
@@ -285,6 +287,58 @@ export class RoomController {
     this.bumpSeq();
     this.refreshDeadline();
     return this.result(this.fanoutRoom(), true);
+  }
+
+  /**
+   * Lobby only: the engine seats players at START_GAME and has no mid-game removal,
+   * so a kick after the deal would desync seating from the roster.
+   */
+  private kick(connId: string, targetId: PlayerId): HandleResult {
+    const playerId = this.boundPlayer(connId);
+    if (!playerId) {
+      return this.result([this.errorTo(connId, 'NOT_JOINED', 'Not joined')], false);
+    }
+    if (playerId !== this.hostId) {
+      return this.result(
+        [this.errorTo(connId, 'NOT_HOST', 'Only the host can remove players')],
+        false,
+      );
+    }
+    if (this.game) {
+      return this.result(
+        [
+          this.errorTo(
+            connId,
+            'GAME_IN_PROGRESS',
+            'Players cannot be removed once the game starts',
+          ),
+        ],
+        false,
+      );
+    }
+    if (targetId === playerId) {
+      return this.result([this.errorTo(connId, 'BAD_MESSAGE', 'You cannot remove yourself')], false);
+    }
+    if (!this.players.some((p) => p.playerId === targetId)) {
+      return this.result([this.errorTo(connId, 'UNKNOWN_PLAYER', 'No such player')], false);
+    }
+
+    this.players = this.players.filter((p) => p.playerId !== targetId);
+
+    // Unbind first so the kicked connections are skipped by the roster fan-out below.
+    const kickedConns: string[] = [];
+    for (const [id, binding] of this.conns) {
+      if (binding.playerId !== targetId) continue;
+      this.conns.set(id, { playerId: null });
+      kickedConns.push(id);
+    }
+
+    this.bumpSeq();
+    const outbound: Outbound[] = kickedConns.map((id) =>
+      this.errorTo(id, 'KICKED', 'The host removed you from the room'),
+    );
+    outbound.push(...this.fanoutRoom());
+    return this.result(outbound, true);
   }
 
   private start(connId: string): HandleResult {

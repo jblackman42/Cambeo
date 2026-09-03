@@ -134,6 +134,8 @@ export function GameProvider({
     applyRules,
     resetLobby,
     renameSelf: null,
+    kickPlayer: null,
+    kicked: false,
     wsStatus: 'idle',
     lastError: null,
     reveals,

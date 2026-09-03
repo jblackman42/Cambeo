@@ -20,6 +20,7 @@ Room codes are 5 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 | --- | --- | --- |
 | `join` | `name`, `playerId?` | Omit `playerId` for a new seat. Send it to reconnect. |
 | `leave` | | Lobby: drop from roster. In-game: disconnect only. |
+| `kick` | `playerId` | Host only, lobby only. Cannot target yourself. Removes the player and sends them `KICKED`. Engine seating is fixed at `start`, so in-game is `GAME_IN_PROGRESS`. |
 | `start` | | Host only. Needs `RuleSet.minPlayers`. |
 | `setRules` | `ruleSet` | Host only, lobby only. Locked after `start`. Invalid schema is `BAD_MESSAGE`. |
 | `action` | `action` (engine `Action`) | `action.playerId` must match the socket. `START_GAME` is not accepted here; use `start`. |
@@ -34,7 +35,7 @@ Room codes are 5 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 | `room` | Roster / connection changes |
 | `state` | After a successful `reduce` — **this recipient’s** redacted view + `lastEvents` |
 | `rejected` | Illegal engine action — **sender only**; others keep the previous seq |
-| `error` | Protocol / room errors (`ROOM_FULL`, `GAME_IN_PROGRESS`, `NOT_HOST`, `INVALID_RULES`, …) |
+| `error` | Protocol / room errors (`ROOM_FULL`, `GAME_IN_PROGRESS`, `NOT_HOST`, `INVALID_RULES`, `KICKED`, …) |
 | `pong` | Heartbeat reply |
 
 `RoomView.ruleSet` is the room’s current config (lobby and in-game). Every `state` / `snapshot.game` is redacted for that player. Hand slots never include face identity during play (`known: false`, no `key`). Drawn-card identity is only on the drawer’s view. Discard top is public. Final scoring reveals all hands.

@@ -1303,6 +1303,38 @@ a {
   color: var(--text-subtle);
 }
 
+.player-row[data-confirming='true'] .player-name {
+  color: var(--negative);
+}
+
+.icon-btn-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--text-subtle);
+}
+
+.btn-compact {
+  min-height: 36px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.removed-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
 /* ── Bottom action bar (thumb zone) ───────────────────────────────────── */
 
 .action-bar {
@@ -1412,6 +1444,8 @@ a {
 .modal-backdrop {
   position: fixed;
   inset: 0;
+  /* Track the dynamic viewport so mobile browser chrome cannot push the panel off-screen. */
+  height: 100dvh;
   z-index: 50;
   display: flex;
   align-items: flex-end;
@@ -1465,6 +1499,11 @@ a {
   padding: 1rem;
 }
 
+/* With no footer to carry it, the body clears the home indicator itself. */
+.modal-panel[data-footer='false'] .modal-body {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
 .modal-foot {
   padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
@@ -1479,6 +1518,23 @@ a {
 @keyframes modal-rise {
   from {
     transform: translateY(1.5rem);
+  }
+}
+
+/* Short prompts read better centred than anchored to the bottom edge. */
+.modal-backdrop[data-placement='center'] {
+  align-items: center;
+  padding: 1rem;
+}
+
+.modal-backdrop[data-placement='center'] .modal-panel {
+  border-radius: var(--radius);
+  animation-name: modal-pop;
+}
+
+@keyframes modal-pop {
+  from {
+    transform: scale(0.96);
   }
 }
 
@@ -1505,9 +1561,18 @@ a {
 .qr-wrap {
   display: flex;
   justify-content: center;
+  max-width: 17rem;
+  margin: 0 auto;
   padding: 0.75rem;
   background: #ffffff;
   border-radius: 10px;
+}
+
+/* Shrink to the panel on narrow screens rather than overflowing it. */
+.qr-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .qr-code-caption {

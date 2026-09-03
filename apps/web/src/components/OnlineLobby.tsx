@@ -1,7 +1,7 @@
 'use client';
 
 import { validateForTable } from '@cambeo/shared';
-import { QrCode, Settings } from 'lucide-react';
+import { Pencil, QrCode, Settings, UserMinus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useGame } from '@/lib/play-context';
 import { getUsername } from '@/lib/session';
@@ -12,16 +12,27 @@ import { QrModal } from '@/components/QrModal';
 import { SettingsPanel } from '@/components/SettingsPanel';
 
 export function OnlineLobby() {
-  const { roomCode, playersList, isHost, startGame, ruleSet, lastError, wsStatus, renameSelf } =
-    useGame();
+  const {
+    roomCode,
+    playersList,
+    isHost,
+    startGame,
+    ruleSet,
+    lastError,
+    wsStatus,
+    renameSelf,
+    kickPlayer,
+    viewerId,
+  } = useGame();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
-  const [needsName, setNeedsName] = useState(false);
+  const [nameEditor, setNameEditor] = useState<'join' | 'edit' | null>(null);
+  const [confirmKickId, setConfirmKickId] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    if (!getUsername().trim()) setNeedsName(true);
+    if (!getUsername().trim()) setNameEditor('join');
   }, []);
 
   const table = validateForTable(ruleSet, playersList.length);
@@ -73,14 +84,66 @@ export function OnlineLobby() {
       )}
 
       <ul className="player-list">
-        {playersList.map((p) => (
-          <li className="player-row" key={p.playerId}>
-            <span className={p.connected ? 'dot-on' : 'dot-off'} aria-hidden />
-            <span className="player-name">{p.name}</span>
-            {p.isHost && <span className="player-tag">Host</span>}
-            {!p.connected && <span className="player-tag">Away</span>}
-          </li>
-        ))}
+        {playersList.map((p) => {
+          const isYou = p.playerId === viewerId;
+          const confirming = confirmKickId === p.playerId;
+          return (
+            <li className="player-row" key={p.playerId} data-confirming={confirming}>
+              <span className={p.connected ? 'dot-on' : 'dot-off'} aria-hidden />
+              <span className="player-name">{confirming ? `Remove ${p.name}?` : p.name}</span>
+
+              {confirming ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-compact"
+                    onClick={() => {
+                      kickPlayer?.(p.playerId);
+                      setConfirmKickId(null);
+                    }}
+                  >
+                    Remove
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn icon-btn-sm"
+                    onClick={() => setConfirmKickId(null)}
+                    aria-label="Cancel"
+                  >
+                    <X size={16} aria-hidden />
+                  </button>
+                </>
+              ) : (
+                <>
+                  {p.isHost && <span className="player-tag">Host</span>}
+                  {!p.connected && <span className="player-tag">Away</span>}
+                  {isYou && (
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn-sm"
+                      onClick={() => setNameEditor('edit')}
+                      aria-label="Edit your name"
+                      title="Edit your name"
+                    >
+                      <Pencil size={16} aria-hidden />
+                    </button>
+                  )}
+                  {isHost && !isYou && (
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn-sm"
+                      onClick={() => setConfirmKickId(p.playerId)}
+                      aria-label={`Remove ${p.name}`}
+                      title={`Remove ${p.name}`}
+                    >
+                      <UserMinus size={16} aria-hidden />
+                    </button>
+                  )}
+                </>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="action-bar">
@@ -105,13 +168,15 @@ export function OnlineLobby() {
       {qrOpen && url && (
         <QrModal url={url} roomCode={roomCode ?? ''} onClose={() => setQrOpen(false)} />
       )}
-      {needsName && (
+      {nameEditor && (
         <NamePrompt
+          initialName={nameEditor === 'edit' ? getUsername() : ''}
+          submitLabel={nameEditor === 'edit' ? 'Save' : 'Join room'}
           onSubmit={(name) => {
             renameSelf?.(name);
-            setNeedsName(false);
+            setNameEditor(null);
           }}
-          onDismiss={() => setNeedsName(false)}
+          onDismiss={() => setNameEditor(null)}
         />
       )}
     </div>

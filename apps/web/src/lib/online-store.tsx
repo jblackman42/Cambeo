@@ -28,6 +28,7 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
   const [mode, setMode] = useState<InteractionMode>({ kind: 'flip' });
   const [wsStatus, setWsStatus] = useState<PlayStore['wsStatus']>('connecting');
   const [reveals, setReveals] = useState<ActiveReveal[]>([]);
+  const [kicked, setKicked] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
 
@@ -69,6 +70,7 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
           break;
         case 'error':
           setLastError(msg.message);
+          if (msg.code === 'KICKED') setKicked(true);
           break;
         case 'pong':
           break;
@@ -78,6 +80,10 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
   );
 
   useEffect(() => {
+    // Being kicked tears the socket down and keeps it down; reconnecting would just
+    // re-join under a fresh player id and put us straight back in the room.
+    if (kicked) return undefined;
+
     let stopped = false;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
 
@@ -129,7 +135,7 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
       if (heartbeat) clearInterval(heartbeat);
       wsRef.current?.close();
     };
-  }, [applyServer, code]);
+  }, [applyServer, code, kicked]);
 
   const send = useCallback((payload: object) => {
     const ws = wsRef.current;
@@ -181,6 +187,8 @@ export function OnlineProvider({ roomCode, children }: { roomCode: string; child
     startGame: () => send({ type: 'start' }),
     applyRules: (next) => send({ type: 'setRules', ruleSet: next }),
     resetLobby: null,
+    kicked,
+    kickPlayer: (targetId) => send({ type: 'kick', playerId: targetId }),
     renameSelf: (name) => {
       const trimmed = name.trim().slice(0, 20);
       if (!trimmed) return;

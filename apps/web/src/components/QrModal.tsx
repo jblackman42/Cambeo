@@ -13,7 +13,8 @@ export function QrModal({
   onClose: () => void;
 }) {
   return (
-    <Modal title="Scan to join" onClose={onClose} size="sm">
+    <Modal title="Scan to join" onClose={onClose} size="sm" placement="center">
+      {/* size is an upper bound; the svg carries a viewBox so CSS scales it down to fit. */}
       <div className="qr-wrap">
         <QRCodeSVG value={url} size={248} level="M" marginSize={2} bgColor="#ffffff" fgColor="#09090b" />
       </div>

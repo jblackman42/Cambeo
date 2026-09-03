@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "build": "node scripts/bundle.mjs",
+    "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

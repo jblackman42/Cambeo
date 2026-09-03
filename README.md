@@ -38,6 +38,25 @@ Hot-seat is deprecated: `/hotseat` still works as an unlinked dev route for driv
 
 If create-room fails, the worker is not running.
 
+## Deploy
+
+The two halves ship separately.
+
+| Half | How |
+| --- | --- |
+| `apps/web` | Auto-deploys from `main` (Vercel Git integration, configured dashboard-side) |
+| `packages/server` | `.github/workflows/deploy-worker.yml` on pushes to `main` touching `packages/**` |
+
+The worker workflow needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets. To deploy it by hand:
+
+```bash
+pnpm deploy:server
+```
+
+A change to `packages/shared/src/protocol.ts` touches both halves. The worker rejects any message it cannot parse with `BAD_MESSAGE`, so shipping the UI without the worker leaves the new control visibly dead — let the worker workflow finish before relying on it.
+
+The web build needs `NEXT_PUBLIC_WS_URL` pointing at the deployed worker (it defaults to `ws://localhost:8787`).
+
 ## Packages
 
 | Package | Role |

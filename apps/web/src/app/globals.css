@@ -1480,6 +1480,23 @@ a {
   }
 }
 
+/* Short prompts read better centred than anchored to the bottom edge. */
+.modal-backdrop[data-placement='center'] {
+  align-items: center;
+  padding: 1rem;
+}
+
+.modal-backdrop[data-placement='center'] .modal-panel {
+  border-radius: var(--radius);
+  animation-name: modal-pop;
+}
+
+@keyframes modal-pop {
+  from {
+    transform: scale(0.96);
+  }
+}
+
 @media (min-width: 600px) {
   .modal-backdrop {
     align-items: center;

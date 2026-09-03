@@ -23,6 +23,7 @@ export function NamePrompt({
     <Modal
       title="Your name"
       size="sm"
+      placement="center"
       onClose={() => (trimmed ? onSubmit(trimmed) : onDismiss())}
       footer={
         <button

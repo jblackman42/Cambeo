@@ -15,7 +15,8 @@ export type RoomErrorCode =
   | 'NEED_PLAYERS'
   | 'UNKNOWN_PLAYER'
   | 'SPOOFED_PLAYER'
-  | 'INVALID_RULES';
+  | 'INVALID_RULES'
+  | 'KICKED';
 
 export interface RoomPlayerInfo {
   playerId: PlayerId;
@@ -39,6 +40,7 @@ export interface RoomView {
 export type ClientMessage =
   | { type: 'join'; name: string; playerId?: PlayerId }
   | { type: 'leave' }
+  | { type: 'kick'; playerId: PlayerId }
   | { type: 'start' }
   | { type: 'setRules'; ruleSet: RuleSet }
   | { type: 'action'; action: Action }
@@ -51,6 +53,7 @@ export const ClientMessageSchema: z.ZodType<ClientMessage> = z.discriminatedUnio
     playerId: z.string().min(1).optional(),
   }),
   z.object({ type: z.literal('leave') }),
+  z.object({ type: z.literal('kick'), playerId: z.string().min(1) }),
   z.object({ type: z.literal('start') }),
   z.object({ type: z.literal('setRules'), ruleSet: RuleSetSchema }),
   z.object({ type: z.literal('action'), action: ActionSchema }),

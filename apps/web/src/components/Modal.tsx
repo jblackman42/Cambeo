@@ -47,6 +47,7 @@ export function Modal({
       <div
         className="modal-panel"
         data-size={size}
+        data-footer={footer ? 'true' : 'false'}
         role="dialog"
         aria-modal="true"
         aria-label={title}

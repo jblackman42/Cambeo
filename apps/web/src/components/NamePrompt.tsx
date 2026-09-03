@@ -3,15 +3,22 @@
 import { Modal } from '@/components/Modal';
 import { useState } from 'react';
 
-/** Shown when a join link lands someone in a room with no name saved on this device. */
+/**
+ * Serves both flows: a join link that landed with no name saved on this device,
+ * and a player editing the name they already have.
+ */
 export function NamePrompt({
+  initialName = '',
+  submitLabel = 'Join room',
   onSubmit,
   onDismiss,
 }: {
+  initialName?: string;
+  submitLabel?: string;
   onSubmit: (name: string) => void;
   onDismiss: () => void;
 }) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName);
   const trimmed = name.trim();
 
   const submit = () => {
@@ -24,7 +31,7 @@ export function NamePrompt({
       title="Your name"
       size="sm"
       placement="center"
-      onClose={() => (trimmed ? onSubmit(trimmed) : onDismiss())}
+      onClose={onDismiss}
       footer={
         <button
           type="button"
@@ -32,7 +39,7 @@ export function NamePrompt({
           disabled={!trimmed}
           onClick={submit}
         >
-          Join room
+          {submitLabel}
         </button>
       }
     >
@@ -44,6 +51,7 @@ export function NamePrompt({
         aria-label="Your name"
         placeholder="Alex"
         onChange={(e) => setName(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
         onKeyDown={(e) => {
           if (e.key === 'Enter') submit();
         }}

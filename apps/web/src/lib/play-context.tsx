@@ -31,6 +31,10 @@ export interface PlayStore {
   resetLobby: ((names: string[]) => void) | null;
   /** Online only: re-announce this player under a new name. */
   renameSelf: ((name: string) => void) | null;
+  /** Online only, host only, lobby only: remove another player from the room. */
+  kickPlayer: ((playerId: PlayerId) => void) | null;
+  /** The host removed us; the socket is down for good. */
+  kicked: boolean;
   wsStatus: 'idle' | 'connecting' | 'open' | 'closed' | 'error';
   lastError: string | null;
   reveals: ActiveReveal[];
